@@ -86,3 +86,28 @@ To prevent mistakes and ensure every email maintains quality:
 2. The draft status in `data/marketing.db` is set to `ready_for_review`.
 3. The human operator reviews the draft, adjusts any wording, and approves it.
 4. Once sent, the status updates to `sent`, and an archive is stored in `outreach/sent/`.
+
+---
+
+## 5. Automated AI Drafting Workflow (Phase 5)
+
+You can trigger email generation on demand with custom directives:
+
+### Option A: In-Chat Skill (`/generate-emails`)
+Type directly into the chat:
+```text
+/generate-emails "Introduce KlipHowl casually, mention their recent video, and ask if they are interested in testing it on their next script."
+```
+Or target a single creator:
+```text
+/generate-emails "Keep it very short and ask if I can send a 15-second demo" for Caleb Writes Code
+```
+
+### Option B: CLI Commands via `uv`
+```bash
+# Preview AI prompt bundles without generating files
+uv run draft-emails --instruction "casual intro + ask if interested" --preview
+
+# Review all generated drafts in the terminal
+uv run marketing review-drafts
+```

@@ -14,6 +14,8 @@ from src.enrichment.enrich_prospects import enrich_all_prospects
 from src.enrichment.deep_enrich import run_deep_enrichment, get_captcha_queue
 from src.discovery.search_prospects import discover_prospects_to_staging, DEFAULT_STAGING_PATH
 from src.storage.dedup import deduplicate_prospects
+from src.outreach.repository import get_all_drafts, get_outreach_candidates
+from src.outreach.generator import prepare_candidate_bundles
 
 # ANSI Color Codes
 CYAN = "\033[36m"
@@ -269,6 +271,30 @@ def cmd_dedup(args):
     print(f"{GREEN}✓ Deduplication completed! {count} duplicate records merged.{RESET}")
 
 
+def cmd_review_drafts(args):
+    drafts = get_all_drafts(DEFAULT_DB_PATH)
+    if not drafts:
+        print(f"\n{YELLOW}No drafts generated yet.{RESET}")
+        print("To generate drafts with AI, use the chat skill:")
+        print('  /generate-emails "your custom instruction here"')
+        print("Or preview prompt bundles via CLI:")
+        print('  uv run draft-emails --instruction "your prompt here" --preview\n')
+        return
+
+    print(f"\n{BOLD}{CYAN}=== Generated Outreach Drafts ({len(drafts)} records) ==={RESET}\n")
+    print(f"{BOLD}{'Channel':<24} {'Status':<18} {'Recipient Email':<28} {'Subject / File'}{RESET}")
+    print("-" * 105)
+
+    for d in drafts:
+        status_color = GREEN if d["status"] == "approved" else (CYAN if d["status"] == "ready_for_review" else YELLOW)
+        status_str = f"{status_color}{d['status']:<18}{RESET}"
+        subj = d["subject_line"] or os.path.basename(d["draft_file_path"] or "")
+        print(f"{d['channel_title'][:22]:<24} {status_str} {d['recipient_email']:<28} {subj[:32]}")
+
+    print("-" * 105)
+    print(f"Draft files stored in: {CYAN}outreach/drafts/{RESET}\n")
+
+
 def cmd_export(args):
     out_csv = args.output or "data/exports/prospects.csv"
     count = export_prospects_to_csv(out_csv, DEFAULT_DB_PATH)
@@ -320,6 +346,16 @@ def main():
     # Dedup
     subparsers.add_parser("dedup", help="Merge any duplicate channels by handle or title")
 
+    # Review Drafts
+    subparsers.add_parser("review-drafts", help="Review generated outreach email drafts")
+
+    # Draft Emails
+    p_draft = subparsers.add_parser("draft-emails", help="Prepare prompt bundles or generate personalized outreach drafts")
+    p_draft.add_argument("--instruction", "-i", required=True, help="Custom directive/angle for the email")
+    p_draft.add_argument("--target", "-t", help="Target specific creator name or ID")
+    p_draft.add_argument("--limit", "-l", type=int, help="Limit number of prospects to process")
+    p_draft.add_argument("--preview", action="store_true", help="Print prompt bundles without writing files")
+
     # Export
     p_export = subparsers.add_parser("export", help="Export prospects from SQLite to CSV")
     p_export.add_argument("--output", help="Output CSV path (default: data/exports/prospects.csv)")
@@ -341,6 +377,12 @@ def main():
         cmd_set_email(args)
     elif args.command == "dedup":
         cmd_dedup(args)
+    elif args.command == "review-drafts":
+        cmd_review_drafts(args)
+    elif args.command == "draft-emails":
+        # Delegate to generator main logic
+        from src.outreach.generator import main as gen_main
+        gen_main()
     elif args.command == "list":
         cmd_list(args)
     elif args.command == "stats":

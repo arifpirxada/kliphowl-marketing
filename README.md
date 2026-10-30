@@ -33,8 +33,24 @@ uv run marketing import-staging
 # 7. Sync manual edits from data/prospects.md into the DB
 uv run marketing import
 
-# 8. Export database to CSV
+# 8. Preview or prepare AI outreach prompt bundles
+uv run draft-emails --instruction "casual intro + ask if interested" --preview
+
+# 9. Review prepared drafts
+uv run marketing review-drafts
+
+# 10. Export database to CSV
 uv run marketing export
+```
+
+### In-Chat AI Email Drafting (`/generate-emails`)
+Whenever you want AI to generate cold emails with a custom angle, simply type in chat:
+```text
+/generate-emails "Introduce KlipHowl casually, mention their recent video, and ask if they are interested."
+```
+Or for a specific creator:
+```text
+/generate-emails "Short 2-sentence intro and ask if they want a demo" for Caleb Writes Code
 ```
 
 ---

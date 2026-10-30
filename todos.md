@@ -66,18 +66,19 @@ This file tracks active milestones, backlog tasks, and completed items for the K
 
 ---
 
-## ✍️ Phase 5: Personalized Cold Outreach Generation (Next Priority)
+## ✍️ Phase 5: Personalized Cold Outreach Generation (Infrastructure Ready)
 
----
-
-## ✍️ Phase 5: Personalized Cold Outreach Generation
-
-- [ ] Create personalization prompt template referencing specific video topics and diagram concepts
-- [ ] Generate individualized markdown draft files in `outreach/drafts/{slug}.md` for top qualified prospects
-- [ ] Include personalized hooks:
-  - Mentioning a specific concept from their recent video
-  - Highlighting time spent on manual diagramming (Excalidraw/Figma)
-  - Offering a 15-second custom animated sample clip or free beta access
+- [x] Build outreach database repository (`src/outreach/repository.py`):
+  - Fetches candidate prospects with verified emails and their top video samples
+  - Inserts and updates records in `outreach_emails` SQLite table with `ready_for_review` status
+- [x] Build context & prompt builder (`src/outreach/prompt_builder.py`):
+  - Bundles creator profile, video details, KlipHowl value prop, and user's custom directive
+- [x] Build draft writer engine & CLI runner (`src/outreach/generator.py`):
+  - Supports `uv run draft-emails --instruction "..." --preview`
+  - Supports `uv run marketing review-drafts` to inspect prepared drafts
+- [x] Create Antigravity Workspace Skill (`.agents/skills/generate-emails/SKILL.md`):
+  - Allows generating drafts on demand via chat: `/generate-emails "<custom directive>"`
+- [ ] **Awaiting User Trigger:** Issue prompt directive to generate email drafts for confirmed creators (e.g. *Caleb Writes Code*, *Codist*, *The Coding Gopher*, etc.)
 - [ ] Add CLI command to review and approve drafts (`python3 src/cli.py review`)
 
 ---
