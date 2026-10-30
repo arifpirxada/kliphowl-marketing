@@ -51,13 +51,23 @@ This file tracks active milestones, backlog tasks, and completed items for the K
 
 ---
 
-## 🚀 Phase 4: Automated YouTube Prospect Discovery (Next Priority)
+## 🚀 Phase 4: Automated YouTube Prospect Discovery (Active / Completed Initial Wave)
 
-- [ ] Build search discovery script (`src/discovery/search_prospects.py`):
+- [x] Build search discovery script (`src/discovery/search_prospects.py` & `src/cli.py discover`):
   - Query clusters: `system design animated`, `software architecture visual`, `how redis works animation`, `devops explained visually`
-  - Automated filtering: 5,000 to 250,000 subscribers, uploaded in last 90 days
-  - Deduplicate against existing records in `data/marketing.db`
-  - Batch import newly found qualified creators
+  - Automated filtering: 5,000 to 350,000 subscribers sweet spot
+  - Email extraction on channel descriptions and external domains
+  - Deduplicate against existing records in `data/marketing.db` (`src/storage/dedup.py`)
+- [x] Executed discovery run:
+  - Scanned 38 fresh channels, added 16 newly qualified prospects
+  - Auto-discovered 7 new verified business emails
+  - Total verified emails in database increased to 14
+  - Total prospects increased to 49
+- [ ] Run additional query batches on demand (`microservices architecture visual`, `docker container architecture explained`, `kafka visually explained`)
+
+---
+
+## ✍️ Phase 5: Personalized Cold Outreach Generation (Next Priority)
 
 ---
 

@@ -12,6 +12,8 @@ from src.storage.db import get_db, DEFAULT_DB_PATH
 from src.storage.sync_prospects import import_prospects_to_db, export_prospects_to_csv
 from src.enrichment.enrich_prospects import enrich_all_prospects
 from src.enrichment.deep_enrich import run_deep_enrichment, get_captcha_queue
+from src.discovery.search_prospects import discover_prospects
+from src.storage.dedup import deduplicate_prospects
 
 # ANSI Color Codes
 CYAN = "\033[36m"
@@ -221,6 +223,31 @@ def cmd_set_email(args):
     print(f"{GREEN}✓ Successfully set email for {BOLD}{prospect['title']}{RESET} ➔ {CYAN}{email}{RESET}")
 
 
+def cmd_discover(args):
+    queries = [args.query] if args.query else None
+    print(f"{CYAN}Running automated YouTube prospect discovery...{RESET}")
+    summary = discover_prospects(
+        queries=queries,
+        min_subs=args.min_subs,
+        max_subs=args.max_subs,
+        max_queries=args.queries,
+        db_path=DEFAULT_DB_PATH
+    )
+    print(f"\n{GREEN}✓ Discovery completed!{RESET}")
+    print(f"  • Queries run: {summary['queries_run']}")
+    print(f"  • Channels scanned: {summary['channels_scanned']}")
+    print(f"  • Newly qualified prospects added: {summary['qualified_added']}")
+    print(f"  • Business emails discovered: {summary['emails_found']}")
+    print(f"  • YouTube API quota units consumed: {summary['quota_used']}")
+    print(f"  • Updated {CYAN}data/exports/prospects.csv{RESET}")
+
+
+def cmd_dedup(args):
+    print(f"{CYAN}Checking for duplicate channels by title and handle...{RESET}")
+    count = deduplicate_prospects(DEFAULT_DB_PATH)
+    print(f"{GREEN}✓ Deduplication completed! {count} duplicate records merged.{RESET}")
+
+
 def cmd_export(args):
     out_csv = args.output or "data/exports/prospects.csv"
     count = export_prospects_to_csv(out_csv, DEFAULT_DB_PATH)
@@ -252,10 +279,20 @@ def main():
     # Captcha Queue
     subparsers.add_parser("captcha-queue", help="Display channels needing 1-click manual captcha check on YouTube")
 
+    # Discover
+    p_disc = subparsers.add_parser("discover", help="Automatically search & qualify new tech YouTube explainers")
+    p_disc.add_argument("--query", help="Specific search query (optional)")
+    p_disc.add_argument("--queries", type=int, default=2, help="Number of default queries to execute (default: 2)")
+    p_disc.add_argument("--min-subs", type=int, default=5000, help="Minimum subscriber threshold (default: 5000)")
+    p_disc.add_argument("--max-subs", type=int, default=350000, help="Maximum subscriber threshold (default: 350000)")
+
     # Set Email
     p_set = subparsers.add_parser("set-email", help="Manually set a verified email for a prospect")
     p_set.add_argument("target", help="Prospect title or ID")
     p_set.add_argument("email", help="Email address to assign")
+
+    # Dedup
+    subparsers.add_parser("dedup", help="Merge any duplicate channels by handle or title")
 
     # Export
     p_export = subparsers.add_parser("export", help="Export prospects from SQLite to CSV")
@@ -270,8 +307,12 @@ def main():
         cmd_deep_enrich(args)
     elif args.command == "captcha-queue":
         cmd_captcha_queue(args)
+    elif args.command == "discover":
+        cmd_discover(args)
     elif args.command == "set-email":
         cmd_set_email(args)
+    elif args.command == "dedup":
+        cmd_dedup(args)
     elif args.command == "list":
         cmd_list(args)
     elif args.command == "stats":
