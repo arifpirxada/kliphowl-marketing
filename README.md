@@ -36,10 +36,18 @@ uv run marketing import
 # 8. Preview or prepare AI outreach prompt bundles
 uv run draft-emails --instruction "casual intro + ask if interested" --preview
 
-# 9. Review prepared drafts
-uv run marketing review-drafts
+# 9. Review and approve drafts in terminal (or python3 src/cli.py review)
+uv run marketing review
+uv run marketing review --approve all
 
-# 10. Export database to CSV
+# 10. Test Brevo SMTP credentials & connectivity
+uv run marketing test-email
+
+# 11. Dispatch approved emails (dry-run first, then live)
+uv run marketing send-approved --dry-run
+uv run marketing send-approved
+
+# 12. Export database to CSV
 uv run marketing export
 ```
 

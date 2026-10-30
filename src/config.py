@@ -35,3 +35,10 @@ SENDER_NAME: str = os.getenv("SENDER_NAME", "Arif")
 SENDER_EMAIL: str = os.getenv("SENDER_EMAIL", "outreach@kliphowl.com")
 PRODUCT_NAME: str = os.getenv("PRODUCT_NAME", "KlipHowl")
 PRODUCT_DEMO_URL: str = os.getenv("PRODUCT_DEMO_URL", "https://kliphowl.com")
+
+# Brevo SMTP Configuration
+BREVO_SMTP_HOST: str = os.getenv("BREVO_SMTP_HOST", "smtp-relay.brevo.com")
+BREVO_SMTP_PORT: int = int(os.getenv("BREVO_SMTP_PORT", "587"))
+BREVO_SMTP_LOGIN: Optional[str] = os.getenv("BREVO_SMTP_LOGIN")
+BREVO_SMTP_KEY: Optional[str] = os.getenv("BREVO_SMTP_KEY")
+EMAIL_FROM: str = os.getenv("EMAIL_FROM", SENDER_EMAIL)

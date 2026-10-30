@@ -78,14 +78,26 @@ This file tracks active milestones, backlog tasks, and completed items for the K
   - Supports `uv run marketing review-drafts` to inspect prepared drafts
 - [x] Create Antigravity Workspace Skill (`.agents/skills/generate-emails/SKILL.md`):
   - Allows generating drafts on demand via chat: `/generate-emails "<custom directive>"`
+- [x] Add CLI command to review and approve drafts (`python3 src/cli.py review` / `uv run marketing review`)
+  - Supports `--id`, `--target`, `--approve <id|all>`, `--reject <id>`
 - [ ] **Awaiting User Trigger:** Issue prompt directive to generate email drafts for confirmed creators (e.g. *Caleb Writes Code*, *Codist*, *The Coding Gopher*, etc.)
-- [ ] Add CLI command to review and approve drafts (`python3 src/cli.py review`)
 
 ---
 
-## 📬 Phase 6: Campaign Dispatch & Feedback Tracking
+## 📬 Phase 6: Campaign Dispatch & Feedback Tracking (Sender Setup Completed)
 
-- [ ] Setup sending workflow (manual or SMTP dispatch via Brevo/Google Workspace)
-- [ ] Log outreach dates and interaction events in `interaction_logs`
+- [x] Configure Brevo SMTP credentials in `.env` and `.env.example`
+- [x] Build SMTP dispatch engine (`src/outreach/sender.py`):
+  - Authenticated and verified connection against Brevo SMTP (`smtp-relay.brevo.com:587`)
+  - Strict safety gate: Never sends unapproved drafts (only `status == 'approved'`)
+  - Added pacing delay between emails to protect sender reputation
+  - Dispatched emails automatically archived in `outreach/sent/YYYY-MM/{slug}.md`
+  - Updates SQLite `outreach_emails` (`status = 'sent'`, `sent_at = timestamp`) and `prospects` (`outreached = 1`)
+  - Logs `email_sent` events in `interaction_logs`
+- [x] Add CLI sending commands:
+  - `uv run marketing test-email` (verifies Brevo connection)
+  - `uv run marketing send-approved --dry-run` (simulates batch sending)
+  - `uv run marketing send-approved` (dispatches all approved emails)
+  - `uv run marketing send --id <id>` (dispatches single approved email)
 - [ ] Track response rate, positive replies, and creator feedback on KlipHowl's animation style
 - [ ] Onboard interested creators to KlipHowl private beta

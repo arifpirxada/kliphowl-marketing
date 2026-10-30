@@ -108,6 +108,41 @@ Or target a single creator:
 # Preview AI prompt bundles without generating files
 uv run draft-emails --instruction "casual intro + ask if interested" --preview
 
-# Review all generated drafts in the terminal
-uv run marketing review-drafts
+# Review and approve drafts in terminal
+uv run marketing review
+# or: python3 src/cli.py review
+
+# Inspect a specific draft
+uv run marketing review --id 1
+
+# Approve a draft (or approve all ready drafts)
+uv run marketing review --approve 1
+uv run marketing review --approve all
+```
+
+---
+
+## 6. Email Dispatch Workflow (Phase 6: Brevo SMTP)
+
+Outreach sending is powered by **Brevo SMTP** (`smtp-relay.brevo.com:587`) with strict safety safeguards:
+
+### Safety Guardrails
+1. **Approval Gate:** The engine **refuses to send** any draft whose status is not `'approved'`. Unreviewed drafts are locked from sending.
+2. **Pacing Delay:** A configurable 3-second delay between emails prevents bulk trigger flags.
+3. **Sent Archiving:** Once delivered, a complete markdown copy is preserved under `outreach/sent/YYYY-MM/{slug}.md` and logged in SQLite `interaction_logs`.
+
+### Execution Commands
+
+```bash
+# 1. Test Brevo connection & authentication
+uv run marketing test-email
+
+# 2. Dry-run test (simulates dispatch without sending)
+uv run marketing send-approved --dry-run
+
+# 3. Dispatch all approved drafts
+uv run marketing send-approved
+
+# 4. Or dispatch a single approved draft by ID
+uv run marketing send --id 1
 ```

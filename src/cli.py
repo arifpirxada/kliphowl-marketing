@@ -14,8 +14,20 @@ from src.enrichment.enrich_prospects import enrich_all_prospects
 from src.enrichment.deep_enrich import run_deep_enrichment, get_captcha_queue
 from src.discovery.search_prospects import discover_prospects_to_staging, DEFAULT_STAGING_PATH
 from src.storage.dedup import deduplicate_prospects
-from src.outreach.repository import get_all_drafts, get_outreach_candidates
+from src.outreach.repository import (
+    get_all_drafts,
+    get_outreach_candidates,
+    get_draft_by_id,
+    get_draft_by_target,
+    update_draft_status,
+    approve_all_ready_drafts
+)
 from src.outreach.generator import prepare_candidate_bundles
+from src.outreach.sender import (
+    test_smtp_connection,
+    dispatch_draft,
+    dispatch_all_approved
+)
 
 # ANSI Color Codes
 CYAN = "\033[36m"
@@ -271,28 +283,128 @@ def cmd_dedup(args):
     print(f"{GREEN}✓ Deduplication completed! {count} duplicate records merged.{RESET}")
 
 
-def cmd_review_drafts(args):
-    drafts = get_all_drafts(DEFAULT_DB_PATH)
-    if not drafts:
-        print(f"\n{YELLOW}No drafts generated yet.{RESET}")
-        print("To generate drafts with AI, use the chat skill:")
-        print('  /generate-emails "your custom instruction here"')
-        print("Or preview prompt bundles via CLI:")
-        print('  uv run draft-emails --instruction "your prompt here" --preview\n')
+def cmd_review(args):
+    # Case 1: Direct approve
+    if args.approve:
+        target = args.approve.strip()
+        if target.lower() == "all":
+            cnt = approve_all_ready_drafts(DEFAULT_DB_PATH)
+            print(f"{GREEN}✓ Approved all {cnt} ready drafts!{RESET}")
+        elif target.isdigit():
+            draft_id = int(target)
+            if update_draft_status(draft_id, "approved"):
+                d = get_draft_by_id(draft_id)
+                name = d['channel_title'] if d else target
+                print(f"{GREEN}✓ Draft #{draft_id} for '{name}' is now APPROVED for sending!{RESET}")
+            else:
+                print(f"{RED}Error:{RESET} Draft #{draft_id} not found.")
+        else:
+            d = get_draft_by_target(target)
+            if d and update_draft_status(d["id"], "approved"):
+                print(f"{GREEN}✓ Draft #{d['id']} for '{d['channel_title']}' is now APPROVED for sending!{RESET}")
+            else:
+                print(f"{RED}Error:{RESET} No draft found matching '{target}'.")
         return
 
-    print(f"\n{BOLD}{CYAN}=== Generated Outreach Drafts ({len(drafts)} records) ==={RESET}\n")
-    print(f"{BOLD}{'Channel':<24} {'Status':<18} {'Recipient Email':<28} {'Subject / File'}{RESET}")
+    # Case 2: Direct reject
+    if args.reject:
+        target = args.reject.strip()
+        draft_id = int(target) if target.isdigit() else None
+        d = get_draft_by_id(draft_id) if draft_id else get_draft_by_target(target)
+        if d and update_draft_status(d["id"], "rejected"):
+            print(f"{YELLOW}✓ Draft #{d['id']} for '{d['channel_title']}' marked as REJECTED.{RESET}")
+        else:
+            print(f"{RED}Error:{RESET} Draft not found matching '{target}'.")
+        return
+
+    # Case 3: Inspect single draft
+    if args.id or args.target:
+        d = get_draft_by_id(args.id) if args.id else get_draft_by_target(args.target)
+        if not d:
+            print(f"{RED}Error:{RESET} Draft not found.")
+            return
+
+        print(f"\n{BOLD}{CYAN}=== Reviewing Draft #{d['id']}: {d['channel_title']} ==={RESET}")
+        print(f"Status: {d['status']} | To: {d['recipient_email']}")
+        print(f"Draft File: {d['draft_file_path']}")
+        print("-" * 65)
+        print(f"{BOLD}Subject:{RESET} {d['subject_line']}\n")
+        print(d["body_markdown"])
+        print("-" * 65)
+
+        try:
+            choice = input(f"Action: [{BOLD}A{RESET}]pprove / [{BOLD}R{RESET}]eject / [{BOLD}S{RESET}]kip? ").strip().lower()
+            if choice == "a":
+                update_draft_status(d["id"], "approved")
+                print(f"{GREEN}✓ Draft #{d['id']} approved!{RESET}")
+            elif choice == "r":
+                update_draft_status(d["id"], "rejected")
+                print(f"{YELLOW}✓ Draft #{d['id']} rejected.{RESET}")
+            else:
+                print("Skipped.")
+        except (EOFError, KeyboardInterrupt):
+            print()
+        return
+
+    # Case 4: Default list
+    drafts = get_all_drafts(DEFAULT_DB_PATH)
+    if not drafts:
+        print(f"\n{YELLOW}No email drafts found in database.{RESET}")
+        print("To generate drafts with AI, run:")
+        print('  /generate-emails "<your instruction here>"')
+        print("Or preview prompt bundles via CLI:")
+        print('  uv run draft-emails --instruction "<instruction>" --preview\n')
+        return
+
+    print(f"\n{BOLD}{CYAN}=== Outreach Email Drafts Review ({len(drafts)} records) ==={RESET}\n")
+    print(f"{BOLD}{'ID':<4} {'Channel Title':<22} {'Status':<18} {'Recipient Email':<28} {'Subject'}{RESET}")
     print("-" * 105)
 
     for d in drafts:
-        status_color = GREEN if d["status"] == "approved" else (CYAN if d["status"] == "ready_for_review" else YELLOW)
+        status_color = GREEN if d["status"] == "approved" else (CYAN if d["status"] == "ready_for_review" else (YELLOW if d["status"] == "sent" else RED))
         status_str = f"{status_color}{d['status']:<18}{RESET}"
-        subj = d["subject_line"] or os.path.basename(d["draft_file_path"] or "")
-        print(f"{d['channel_title'][:22]:<24} {status_str} {d['recipient_email']:<28} {subj[:32]}")
+        subj = (d["subject_line"] or "")[:30]
+        print(f"{d['id']:<4} {d['channel_title'][:20]:<22} {status_str} {d['recipient_email']:<28} {subj}")
 
     print("-" * 105)
-    print(f"Draft files stored in: {CYAN}outreach/drafts/{RESET}\n")
+    print("Commands:")
+    print("  • Inspect draft details:  uv run marketing review --id <ID>")
+    print("  • Approve draft:          uv run marketing review --approve <ID | all>")
+    print("  • Reject draft:           uv run marketing review --reject <ID>")
+    print("  • Dispatch approved:      uv run marketing send-approved\n")
+
+
+def cmd_test_email(args):
+    print(f"{CYAN}Testing Brevo SMTP connection and authentication...{RESET}")
+    try:
+        if test_smtp_connection():
+            print(f"{GREEN}✓ SUCCESS: Authenticated with Brevo SMTP successfully! Ready for outreach dispatch.{RESET}")
+    except Exception as e:
+        print(f"{RED}✗ ERROR: SMTP Connection failed:{RESET} {e}")
+
+
+def cmd_send(args):
+    if args.id:
+        try:
+            res = dispatch_draft(args.id, dry_run=args.dry_run, db_path=DEFAULT_DB_PATH)
+            if res.get("dry_run"):
+                print(f"{YELLOW}[DRY RUN] Would send draft #{args.id} to {res['recipient']}{RESET}")
+            else:
+                print(f"{GREEN}✓ Successfully dispatched email #{args.id} to {res['recipient']}!{RESET}")
+                print(f"  • Archived copy saved to: {CYAN}{res.get('archive_path')}{RESET}")
+        except Exception as e:
+            print(f"{RED}Error:{RESET} {e}")
+    else:
+        print(f"{CYAN}Dispatching approved outreach drafts (dry_run={args.dry_run})...{RESET}")
+        res = dispatch_all_approved(limit=args.limit, dry_run=args.dry_run, db_path=DEFAULT_DB_PATH)
+        print(f"\n{BOLD}{CYAN}=== Outreach Dispatch Summary ==={RESET}")
+        print(f"  • Total Approved: {res['total_approved']}")
+        print(f"  • Sent: {res['sent_count']}")
+        print(f"  • Dry Run: {res['dry_run']}")
+        if res.get("results"):
+            for r in res["results"]:
+                status = f"{GREEN}Sent{RESET}" if r.get("sent") else (f"{YELLOW}Dry Run{RESET}" if r.get("dry_run") else f"{RED}Failed: {r.get('error')}{RESET}")
+                print(f"   • Draft #{r['draft_id']}: {status}")
 
 
 def cmd_export(args):
@@ -347,7 +459,14 @@ def main():
     subparsers.add_parser("dedup", help="Merge any duplicate channels by handle or title")
 
     # Review Drafts
-    subparsers.add_parser("review-drafts", help="Review generated outreach email drafts")
+    p_rev = subparsers.add_parser("review", help="Review and approve cold outreach email drafts")
+    p_rev.add_argument("--id", type=int, help="Inspect a specific draft by ID")
+    p_rev.add_argument("--target", help="Inspect draft for specific creator")
+    p_rev.add_argument("--approve", help="Approve draft by ID, creator name, or 'all'")
+    p_rev.add_argument("--reject", help="Reject draft by ID or creator name")
+
+    # Legacy alias review-drafts
+    subparsers.add_parser("review-drafts", help="Alias for review")
 
     # Draft Emails
     p_draft = subparsers.add_parser("draft-emails", help="Prepare prompt bundles or generate personalized outreach drafts")
@@ -355,6 +474,20 @@ def main():
     p_draft.add_argument("--target", "-t", help="Target specific creator name or ID")
     p_draft.add_argument("--limit", "-l", type=int, help="Limit number of prospects to process")
     p_draft.add_argument("--preview", action="store_true", help="Print prompt bundles without writing files")
+
+    # Test Email Connection
+    subparsers.add_parser("test-email", help="Verify Brevo SMTP connectivity and credentials")
+
+    # Send Emails
+    p_send = subparsers.add_parser("send", help="Dispatch approved outreach email(s) via Brevo SMTP")
+    p_send.add_argument("--id", type=int, help="Send a specific approved draft ID")
+    p_send.add_argument("--limit", type=int, default=20, help="Maximum emails to send in batch (default: 20)")
+    p_send.add_argument("--dry-run", action="store_true", help="Simulate sending without actually delivering")
+
+    # Send Approved Alias
+    p_send_app = subparsers.add_parser("send-approved", help="Dispatch all approved drafts via Brevo SMTP")
+    p_send_app.add_argument("--limit", type=int, default=20, help="Maximum emails to send in batch (default: 20)")
+    p_send_app.add_argument("--dry-run", action="store_true", help="Simulate sending without actually delivering")
 
     # Export
     p_export = subparsers.add_parser("export", help="Export prospects from SQLite to CSV")
@@ -377,12 +510,26 @@ def main():
         cmd_set_email(args)
     elif args.command == "dedup":
         cmd_dedup(args)
-    elif args.command == "review-drafts":
-        cmd_review_drafts(args)
+    elif args.command in ("review", "review-drafts"):
+        # Ensure default attributes exist if called via alias
+        if not hasattr(args, "id"):
+            args.id = None
+        if not hasattr(args, "target"):
+            args.target = None
+        if not hasattr(args, "approve"):
+            args.approve = None
+        if not hasattr(args, "reject"):
+            args.reject = None
+        cmd_review(args)
     elif args.command == "draft-emails":
-        # Delegate to generator main logic
         from src.outreach.generator import main as gen_main
         gen_main()
+    elif args.command == "test-email":
+        cmd_test_email(args)
+    elif args.command in ("send", "send-approved"):
+        if not hasattr(args, "id"):
+            args.id = None
+        cmd_send(args)
     elif args.command == "list":
         cmd_list(args)
     elif args.command == "stats":
