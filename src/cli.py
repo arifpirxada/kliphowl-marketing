@@ -20,7 +20,9 @@ from src.outreach.repository import (
     get_draft_by_id,
     get_draft_by_target,
     update_draft_status,
-    approve_all_ready_drafts
+    approve_all_ready_drafts,
+    sync_drafts_from_disk,
+    record_prospect_reply
 )
 from src.outreach.generator import prepare_candidate_bundles
 from src.outreach.sender import (
@@ -68,11 +70,16 @@ def cmd_help_overview(args=None):
    {CYAN}uv run marketing dedup{RESET}
        Safely merge duplicate channels by handle or title without data loss.
 
-{BOLD}{MAGENTA}3. ✍️ PERSONALIZED COLD EMAIL DRAFTING & REVIEW{RESET}
+{BOLD}{MAGENTA}3. ✍️ PERSONALIZED COLD EMAIL DRAFTING, EDITING & REVIEW{RESET}
    {BOLD}In-Chat AI Command:{RESET}
        {GREEN}/generate-emails "<your custom directive>"{RESET}
-       AI reads prospect metadata + specific video titles and writes drafts into {CYAN}outreach/drafts/{RESET}.
+       AI reads prospect metadata + specific video titles and writes drafts into {CYAN}outreach/drafts/{{slug}}.md{RESET}.
        Example: {GREEN}/generate-emails "Casual intro, ask if they want a 15s demo" for Caleb Writes Code{RESET}
+   {BOLD}✏️ Human Editing & Personalization:{RESET}
+       Open and edit any file in {CYAN}outreach/drafts/{{slug}}.md{RESET} directly in your editor.
+       Any changes you make to Subject or Body {GREEN}automatically sync{RESET} to SQLite when reviewing or sending!
+   {CYAN}uv run marketing sync-drafts{RESET}
+       Explicitly re-sync markdown file edits into SQLite.
    {CYAN}uv run draft-emails -i "<prompt>" --preview{RESET}
        Preview AI prompt bundles for creators in terminal without writing files.
    {CYAN}uv run marketing review{RESET}
@@ -93,7 +100,14 @@ def cmd_help_overview(args=None):
    {CYAN}uv run marketing send --id <ID>{RESET}
        Dispatch a single approved draft by its database ID.
 
-{BOLD}{MAGENTA}5. 💾 DATA SYNC & SPREADSHEET EXPORTS{RESET}
+{BOLD}{MAGENTA}5. 📊 OUTREACH TRACKING & RESPONSE LOGGING{RESET}
+   {CYAN}uv run marketing stats{RESET}
+       View funnel metrics (discovered, in_outreach, responded, customers).
+   {CYAN}uv run marketing log-reply "<Channel Name>" --status <interested|not_interested|ghosted>{RESET}
+       Record creator reply, optional notes, or conversion ({CYAN}--signed-up{RESET}).
+       Updates SQLite outreach status and refreshes {CYAN}data/exports/prospects.csv{RESET}.
+
+{BOLD}{MAGENTA}6. 💾 DATA SYNC & SPREADSHEET EXPORTS{RESET}
    {CYAN}uv run marketing export{RESET}
        Export entire database to {CYAN}data/exports/prospects.csv{RESET} for Excel/Sheets.
    {CYAN}uv run marketing import{RESET}
@@ -221,6 +235,12 @@ def cmd_stats(args):
     cur.execute("SELECT outreached, COUNT(*) as cnt FROM prospects GROUP BY outreached")
     outreach = cur.fetchall()
 
+    cur.execute("SELECT response_status, COUNT(*) as cnt FROM prospects WHERE response_status != 'none' GROUP BY response_status")
+    responses = cur.fetchall()
+
+    cur.execute("SELECT COUNT(*) as cnt FROM prospects WHERE signed_up = 1")
+    signed = cur.fetchone()["cnt"]
+
     conn.close()
 
     print(f"\n{BOLD}{CYAN}=== Prospect Pipeline Summary ==={RESET}")
@@ -235,6 +255,14 @@ def cmd_stats(args):
     for o in outreach:
         status_label = "Contacted" if o['outreached'] else "Not Contacted"
         print(f"  • {status_label}: {o['cnt']}")
+
+    if responses:
+        print(f"\n{BOLD}Responses Recorded:{RESET}")
+        for r in responses:
+            print(f"  • {r['response_status'].capitalize()}: {r['cnt']}")
+
+    if signed > 0:
+        print(f"\n{BOLD}{GREEN}🎉 Active Customers / Signups:{RESET} {signed}")
     print()
 
 
@@ -471,6 +499,39 @@ def cmd_send(args):
                 print(f"   • Draft #{r['draft_id']}: {status}")
 
 
+def cmd_sync_drafts(args):
+    """Scan outreach/drafts/*.md for manual edits and sync to SQLite."""
+    print(f"{CYAN}Scanning outreach/drafts/*.md for manual edits...{RESET}")
+    cnt = sync_drafts_from_disk(db_path=DEFAULT_DB_PATH)
+    if cnt > 0:
+        print(f"{GREEN}✓ Synchronized {cnt} edited draft(s) into database!{RESET}")
+    else:
+        print("✓ All drafts are up-to-date with database.")
+
+
+def cmd_log_reply(args):
+    """Record creator reply or conversion into DB and refresh CSV."""
+    res = record_prospect_reply(
+        target=args.target,
+        response_status=args.status,
+        notes=args.notes,
+        signed_up=args.signed_up,
+        free_credits=args.free_credits or 0,
+        db_path=DEFAULT_DB_PATH
+    )
+    if not res:
+        print(f"{RED}Error:{RESET} Prospect matching '{args.target}' not found.")
+        return
+    print(f"{GREEN}✓ Logged response for '{res['title']}':{RESET}")
+    print(f"  • Response Status: {BOLD}{res['response_status']}{RESET}")
+    print(f"  • Overall Prospect Status: {BOLD}{res['status']}{RESET}")
+    if args.signed_up:
+        print(f"  • Signed Up: {GREEN}Yes 🎉{RESET}")
+    if args.notes:
+        print(f"  • Notes: {args.notes}")
+    print(f"  • Updated CSV export at {CYAN}data/exports/prospects.csv{RESET}")
+
+
 def cmd_export(args):
     out_csv = args.output or "data/exports/prospects.csv"
     count = export_prospects_to_csv(out_csv, DEFAULT_DB_PATH)
@@ -557,6 +618,17 @@ def main():
     p_export = subparsers.add_parser("export", help="Export prospects from SQLite to CSV")
     p_export.add_argument("--output", help="Output CSV path (default: data/exports/prospects.csv)")
 
+    # Sync Drafts
+    subparsers.add_parser("sync-drafts", help="Scan outreach/drafts/*.md and sync manual edits into SQLite")
+
+    # Log Reply
+    p_log = subparsers.add_parser("log-reply", help="Log creator reply or conversion into DB")
+    p_log.add_argument("target", help="Prospect channel name, handle, or ID")
+    p_log.add_argument("--status", choices=["interested", "not_interested", "ghosted", "none"], required=True, help="Response status")
+    p_log.add_argument("--notes", help="Notes on reply or feedback")
+    p_log.add_argument("--signed-up", action="store_true", help="Mark prospect as signed up user")
+    p_log.add_argument("--free-credits", type=int, default=0, help="Number of free credits allocated")
+
     # Workflow Help Cheatsheet
     subparsers.add_parser("help", help="Show complete workflow cheatsheet")
 
@@ -609,6 +681,10 @@ def main():
         cmd_stats(args)
     elif args.command == "export":
         cmd_export(args)
+    elif args.command == "sync-drafts":
+        cmd_sync_drafts(args)
+    elif args.command == "log-reply":
+        cmd_log_reply(args)
     else:
         parser.print_help()
 
