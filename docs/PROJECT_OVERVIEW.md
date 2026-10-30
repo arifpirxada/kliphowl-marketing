@@ -75,3 +75,13 @@ flowchart TD
     Draft --> Review["6. User Review & Approval\n(`outreach/drafts/*.md`)"]
     Review --> Outreach["7. Outreach Dispatch & Tracking\n(Sent, Follow-ups, Responses)"]
 ```
+
+---
+
+## 5. Development & Git Conventions
+
+- **Environment & Commands:** Always use `uv` for dependencies and command execution (`uv run marketing ...`, `uv run discover ...`).
+- **Commit Attribution:** All git commits must append the co-author trailer:
+  ```text
+  Co-authored-by: Gemini <gemini@google.com>
+  ```

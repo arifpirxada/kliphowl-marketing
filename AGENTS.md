@@ -49,3 +49,18 @@ This repository is dedicated to marketing, prospect intelligence, and personaliz
 
 - If you make structural changes to data models, prospecting workflows, or discovery logic, update the corresponding documentation files in `docs/` immediately.
 - Maintain consistency across `PROJECT_OVERVIEW.md`, `STORAGE_PLAN.md`, `YOUTUBE_DISCOVERY_PLAN.md`, and `OUTREACH_STRATEGY.md`.
+
+---
+
+## 6. Git Commit Guidelines
+
+- **Co-Author Trailer:** Whenever creating a git commit in this repository, always append the co-author trailer:
+  ```text
+  Co-authored-by: Gemini <gemini@google.com>
+  ```
+  Example commit format:
+  ```bash
+  git commit -m "feat: description of work
+
+  Co-authored-by: Gemini <gemini@google.com>"
+  ```
