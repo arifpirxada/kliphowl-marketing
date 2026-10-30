@@ -6,19 +6,24 @@ This document defines where and how prospect data, channel metadata, video insig
 
 ## 1. Storage Architecture Overview
 
-We adopt a **Dual-Layer Storage Strategy**:
+We adopt a **Tri-Layer Synchronized Storage Strategy**:
 
-1. **Relational Database (Primary Source of Truth):**
+1. **Relational Database (Primary Engine & Automation Backend):**
    - Implemented with **SQLite 3** at `data/marketing.db`.
    - **Why SQLite?**
      - Single local file, zero server setup, zero Docker overhead.
      - Built into Python standard library (`import sqlite3`) — zero external runtime dependency.
-     - Enforces referential integrity (foreign keys between channels, videos, campaigns, and email drafts).
+     - Enforces referential integrity (foreign keys between prospects, videos, campaigns, and email drafts).
      - Allows fast, robust SQL queries, deduplication, filtering, and state transitions.
 
-2. **Human-Reviewable File System Layer:**
-   - **Markdown Email Drafts (`outreach/drafts/{channel_slug}.md`):** Agents generate complete email drafts as clean markdown files. The human operator can open, read, edit, or copy them directly.
-   - **CSV / JSON Exports (`data/exports/`):** Quick exports for viewing in Excel, Google Sheets, or Notion.
+2. **Human-Friendly Markdown Prospect Tracker (`data/prospects.md` / `data/exports/prospects.md`):**
+   - Obsidian/GitHub callout style (`> [!warning] CreatorName`).
+   - Allows creators/operators to manually jot down channels, notes, video links, and thoughts during research.
+   - Synchronized seamlessly with SQLite using `python3 src/cli.py import`.
+
+3. **Human-Reviewable File System & Exports:**
+   - **Markdown Email Drafts (`outreach/drafts/{channel_slug}.md`):** Complete outreach copy generated as clean markdown files for quick inspection before sending.
+   - **CSV / JSON Exports (`data/exports/prospects.csv`):** Generated snapshots for spreadsheet viewing in Excel or Google Sheets (`python3 src/cli.py export`).
 
 ---
 
@@ -27,57 +32,79 @@ We adopt a **Dual-Layer Storage Strategy**:
 ```text
 marketing/
 ├── data/
-│   ├── marketing.db            # SQLite database file (gitignored if containing private leads)
+│   ├── marketing.db            # SQLite database file (source of truth)
 │   ├── schema.sql              # Initial DDL migration script
+│   ├── prospects.md            # Human research & notes tracker (Obsidian callout format)
 │   └── exports/                # Export snapshots
-│       ├── prospects.csv
-│       └── prospects.json
+│       ├── prospects.csv       # Generated CSV spreadsheet
+│       └── prospects.md        # Alternative path / snapshot
+│
+├── src/
+│   ├── cli.py                  # CLI interface: list, stats, import, export
+│   └── storage/
+│       ├── db.py               # SQLite connection helpers
+│       └── sync_prospects.py   # Markdown <-> SQLite bidirectional sync
 │
 └── outreach/
-    ├── templates/              # Base email frameworks (e.g., pain_point.md, sample_clip.md)
-    │   ├── system_design_offer.md
-    │   ├── pain_point_animation.md
-    │   └── quick_feedback.md
-    │
+    ├── templates/              # Base email frameworks
     ├── drafts/                 # Individual generated outreach emails awaiting review
-    │   ├── bytebytego_outreach.md
-    │   └── hussein_nasser_outreach.md
-    │
-    └── sent/                   # Historical record of approved & dispatched emails
-        └── 2026-11/
+    └── sent/                   # Historical record of dispatched emails
 ```
 
 ---
 
-## 3. Relational Database Schema (`data/marketing.db`)
+## 3. How to View Your Prospects
+
+You have **four convenient ways** to view and interact with your prospect pipeline:
+
+1. **In Markdown (`data/prospects.md`):**
+   - Read and edit notes directly in your code editor or Obsidian.
+   - Run `python3 src/cli.py import` to sync any edits back into SQLite.
+
+2. **In the Terminal CLI (`python3 src/cli.py list`):**
+   - Run `python3 src/cli.py list` for a clean, colored table showing subscribers, match score, type, outreach status, and links.
+   - Run `python3 src/cli.py stats` for an instant summary of matches and pipeline progress.
+
+3. **In VS Code / Cursor GUI (Recommended for Visual Database Browsing):**
+   - Install the free **SQLite Viewer** extension (by Florian Klampfer).
+   - Click on `data/marketing.db` directly in your file explorer.
+   - Browse tables like an interactive spreadsheet with 1-click sorting, filtering, and search.
+
+4. **In Google Sheets / Excel:**
+   - Run `python3 src/cli.py export`.
+   - Open `data/exports/prospects.csv` in Excel or import into Google Sheets.
+
+---
+
+## 4. Relational Database Schema (`data/marketing.db`)
 
 ```mermaid
 erDiagram
-    CHANNELS ||--o{ VIDEOS : "has recent"
-    CHANNELS ||--o{ OUTREACH_EMAILS : "receives"
+    PROSPECTS ||--o{ VIDEOS : "has sample/recent"
+    PROSPECTS ||--o{ OUTREACH_EMAILS : "receives"
     CAMPAIGNS ||--o{ OUTREACH_EMAILS : "groups"
     OUTREACH_EMAILS ||--o{ INTERACTION_LOGS : "logs"
 
-    CHANNELS {
-        string channel_id PK
+    PROSPECTS {
+        string id PK
         string title
         string handle
         string custom_url
+        string sample_video_url
+        string prospect_type
+        string size_tier
         integer subscriber_count
-        integer video_count
-        integer view_count
         string country
-        string description
         string primary_email
-        string email_source
-        string twitter_url
-        string github_url
-        string website_url
-        string niche_category
-        string animation_style_notes
+        string match_level
         string status
-        timestamp created_at
+        integer outreached
+        string response_status
+        integer signed_up
+        integer free_credits_given
+        string raw_notes
         timestamp updated_at
+    }
     }
 
     VIDEOS {
