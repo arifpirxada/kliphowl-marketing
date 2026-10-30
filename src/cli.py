@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.storage.db import get_db, DEFAULT_DB_PATH
 from src.storage.sync_prospects import import_prospects_to_db, export_prospects_to_csv
 from src.enrichment.enrich_prospects import enrich_all_prospects
+from src.enrichment.deep_enrich import run_deep_enrichment, get_captcha_queue
 
 # ANSI Color Codes
 CYAN = "\033[36m"
@@ -157,6 +158,69 @@ def cmd_stats(args):
     print()
 
 
+def cmd_deep_enrich(args):
+    print(f"{CYAN}Running deep enrichment: crawling websites, social links, and GitHub profiles...{RESET}")
+    summary = run_deep_enrichment(DEFAULT_DB_PATH)
+    print(f"\n{GREEN}✓ Deep enrichment complete!{RESET}")
+    print(f"  • Social links updated: {summary['links_updated']}")
+    print(f"  • Additional emails found: {summary['new_emails_found']}")
+    print(f"  • Updated {CYAN}data/exports/prospects.csv{RESET}")
+
+
+def cmd_captcha_queue(args):
+    queue = get_captcha_queue(DEFAULT_DB_PATH)
+    if not queue:
+        print(f"{GREEN}All YouTube prospects already have emails!{RESET}")
+        return
+
+    print(f"\n{BOLD}{CYAN}=== Manual Email Captcha Queue ({len(queue)} channels missing email) ==={RESET}")
+    print(f"YouTube gates some emails behind a web reCAPTCHA on their About page.")
+    print(f"Open any of the links below, solve the captcha, then run:\n")
+    print(f"  {BOLD}python3 src/cli.py set-email <prospect_title_or_id> <email>{RESET}\n")
+    print(f"{BOLD}{'Name / Title':<26} {'Match':<9} {'Subs':<7} {'Direct About Link'}{RESET}")
+    print("-" * 85)
+
+    for item in queue:
+        title = item["title"][:24]
+        match_str = format_match(item["match"])
+        subs_str = format_number(item["subs"])
+        print(f"{title:<26} {match_str} {subs_str:<7} {item['about_url']}")
+
+    print("-" * 85)
+
+
+def cmd_set_email(args):
+    conn = get_db(DEFAULT_DB_PATH)
+    cur = conn.cursor()
+
+    target = args.target.strip()
+    email = args.email.strip()
+
+    # Search by id or title
+    cur.execute("""
+        SELECT id, title, primary_email FROM prospects
+        WHERE id = ? OR LOWER(title) = LOWER(?) OR title LIKE ?
+    """, (target, target, f"%{target}%"))
+    rows = cur.fetchall()
+
+    if not rows:
+        print(f"{RED}Error:{RESET} No prospect found matching '{target}'")
+        conn.close()
+        return
+
+    prospect = rows[0]
+    cur.execute("""
+        UPDATE prospects
+        SET primary_email = ?, email_source = 'manual', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    """, (email, prospect["id"]))
+    conn.commit()
+    conn.close()
+
+    export_prospects_to_csv("data/exports/prospects.csv", DEFAULT_DB_PATH)
+    print(f"{GREEN}✓ Successfully set email for {BOLD}{prospect['title']}{RESET} ➔ {CYAN}{email}{RESET}")
+
+
 def cmd_export(args):
     out_csv = args.output or "data/exports/prospects.csv"
     count = export_prospects_to_csv(out_csv, DEFAULT_DB_PATH)
@@ -180,7 +244,18 @@ def main():
     subparsers.add_parser("stats", help="Display aggregate stats of prospects")
 
     # Enrich
-    subparsers.add_parser("enrich", help="Enrich prospects with YouTube API data and extract emails")
+    subparsers.add_parser("enrich", help="Enrich prospects with YouTube API data and extract emails from descriptions")
+
+    # Deep Enrich
+    subparsers.add_parser("deep-enrich", help="Extract social links and crawl websites/GitHub for emails")
+
+    # Captcha Queue
+    subparsers.add_parser("captcha-queue", help="Display channels needing 1-click manual captcha check on YouTube")
+
+    # Set Email
+    p_set = subparsers.add_parser("set-email", help="Manually set a verified email for a prospect")
+    p_set.add_argument("target", help="Prospect title or ID")
+    p_set.add_argument("email", help="Email address to assign")
 
     # Export
     p_export = subparsers.add_parser("export", help="Export prospects from SQLite to CSV")
@@ -191,6 +266,12 @@ def main():
         cmd_import(args)
     elif args.command == "enrich":
         cmd_enrich(args)
+    elif args.command == "deep-enrich":
+        cmd_deep_enrich(args)
+    elif args.command == "captcha-queue":
+        cmd_captcha_queue(args)
+    elif args.command == "set-email":
+        cmd_set_email(args)
     elif args.command == "list":
         cmd_list(args)
     elif args.command == "stats":

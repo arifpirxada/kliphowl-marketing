@@ -29,7 +29,7 @@ This file tracks active milestones, backlog tasks, and completed items for the K
 
 ---
 
-## 🔍 Phase 3: Email & Contact Scraping (In Progress)
+## 🔍 Phase 3: Email & Contact Scraping (Completed)
 
 - [x] Build regex email extractor for channel descriptions (`src/enrichment/email_extractor.py`)
 - [x] Auto-discovered 6 verified business inquiry emails directly from channel descriptions:
@@ -39,13 +39,19 @@ This file tracks active milestones, backlog tasks, and completed items for the K
   - Brain Station Advanced (`videos.brainstation@gmail.com`)
   - The Coding Gopher (`thecodinggopher@gmail.com`)
   - Techs Explained (`alexjaxon614@gmail.com`)
-- [ ] Secondary link scraper: Extract external links (GitHub, Twitter, personal websites) from descriptions
-- [ ] Add CLI helper for manual captcha queue: output direct links to YouTube About pages for quick 1-click captcha solves on high-match creators without public emails
-- [ ] Build GitHub profile email finder for tech creators linking their GitHub repos
+- [x] Build secondary link crawler (`src/enrichment/link_crawler.py` & `src/enrichment/deep_enrich.py`):
+  - Extracted Twitter/X, GitHub, and personal website links from descriptions
+  - Crawled personal websites and found additional business emails:
+    - VillageTalkies (`info@villagetalkies.com`)
+    - Zeus / James HK (`james@jameshk.com`)
+- [x] Build manual captcha queue CLI helper (`python3 src/cli.py captcha-queue`):
+  - Automatically formats clean direct links to `@handle/about` for all channels missing an email
+  - Added 1-command email setter (`python3 src/cli.py set-email <prospect> <email>`)
+- [x] Synchronized all newly discovered contact details to `data/marketing.db` and `data/exports/prospects.csv`
 
 ---
 
-## 🚀 Phase 4: Automated YouTube Prospect Discovery (Next Step)
+## 🚀 Phase 4: Automated YouTube Prospect Discovery (Next Priority)
 
 - [ ] Build search discovery script (`src/discovery/search_prospects.py`):
   - Query clusters: `system design animated`, `software architecture visual`, `how redis works animation`, `devops explained visually`

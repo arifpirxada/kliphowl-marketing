@@ -3,10 +3,9 @@
 import re
 from typing import List, Optional
 
-# Regular expression for matching email addresses
-# Excludes common image extensions or false positives
+# Regular expression for matching email addresses with valid top-level domain
 EMAIL_REGEX = re.compile(
-    r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+'
+    r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.(?:[a-zA-Z0-9-.]+\.)?[a-zA-Z]{2,10}'
 )
 
 # Common generic/platform emails to ignore
@@ -17,6 +16,9 @@ IGNORED_DOMAINS = {
     "example.com",
     "domain.com",
     "sentry.io",
+    "w3.org",
+    "schema.org",
+    "github.com",
 }
 
 # Image-like false positives that match regex
@@ -43,7 +45,7 @@ def extract_emails_from_text(text: str) -> List[str]:
         if any(email.endswith(ext) for ext in IGNORED_EXTENSIONS):
             continue
         domain = email.split("@")[-1]
-        if domain in IGNORED_DOMAINS:
+        if any(domain == d or domain.endswith("." + d) for d in IGNORED_DOMAINS):
             continue
         if len(email) > 6 and "." in domain:
             if email not in valid_emails:
