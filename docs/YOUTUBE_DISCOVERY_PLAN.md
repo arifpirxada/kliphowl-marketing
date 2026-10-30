@@ -66,11 +66,12 @@ QUERY_CLUSTERS = {
 flowchart TD
     A["YouTube Search API\n(`search.list` with topic queries)"] --> B["Extract Unique Channel IDs"]
     B --> C["Batch Channel Details\n(`channels.list` - subs, views, description, links)"]
-    C --> D{"Filter Criteria\n5K <= Subs <= 250K?\nActive in last 90 days?"}
-    D -- No --> E["Discard / Archive"]
-    D -- Yes --> F["Extract Contact Details\n(Regex in Description, About Links, GitHub, Twitter)"]
-    F --> G["Fetch Latest 3-5 Videos\n(`videos.list` - titles, topics)"]
-    G --> H["Save to SQLite Database\n(`data/marketing.db`)"]
+    C --> D{"Filter Criteria\n5K <= Subs <= 350K?\nAnimation/Explainer topic?"}
+    D -- No --> E["Discard / Skip"]
+    D -- Yes --> F["Extract Contact Details\n(Regex in Description, Website Crawler)"]
+    F --> G["Write to Staging Markdown\n(`data/discovery_staging.md`)"]
+    G --> H["Human Operator Review\n(Delete unwanted, adjust matches)"]
+    H --> I["Merge into Database\n(`uv run marketing import-staging`)"]
 ```
 
 ---
@@ -96,18 +97,18 @@ For high-value qualified channels (e.g., 50k subs, perfect KlipHowl fit) where n
 
 ---
 
-## 5. Python Scripts Layout (`src/`)
+## 5. Execution Commands (using `uv`)
 
-```text
-src/
-├── discovery/
-│   ├── yt_client.py           # Authenticated YouTube Data API v3 wrapper with quota tracking
-│   ├── search_prospects.py    # Executes query clusters and gathers candidate channel IDs
-│   └── channel_fetcher.py     # Batches channels.list and applies 5K-250K filters
-│
-├── enrichment/
-│   ├── email_extractor.py     # Regex parser for channel descriptions & external links
-│   └── github_finder.py       # Looks up linked GitHub profiles for verified dev emails
-│
-└── runner.py                  # CLI orchestrator: run discovery -> filter -> enrich -> save to DB
+```bash
+# Run automated YouTube discovery (stages into data/discovery_staging.md)
+uv run discover
+
+# Search a specific custom keyword query
+uv run discover --query "microservices architecture visual guide"
+
+# Or via marketing CLI
+uv run marketing discover --queries 2
+
+# After reviewing data/discovery_staging.md and deleting unwanted channels:
+uv run marketing import-staging
 ```

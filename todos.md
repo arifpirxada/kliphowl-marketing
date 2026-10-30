@@ -29,7 +29,7 @@ This file tracks active milestones, backlog tasks, and completed items for the K
 
 ---
 
-## 🔍 Phase 3: Email & Contact Scraping (Completed)
+## 🔍 Phase 3: Email & Contact Scraping (ACTIVE - Human Captcha Queue)
 
 - [x] Build regex email extractor for channel descriptions (`src/enrichment/email_extractor.py`)
 - [x] Auto-discovered 6 verified business inquiry emails directly from channel descriptions:
@@ -44,26 +44,25 @@ This file tracks active milestones, backlog tasks, and completed items for the K
   - Crawled personal websites and found additional business emails:
     - VillageTalkies (`info@villagetalkies.com`)
     - Zeus / James HK (`james@jameshk.com`)
-- [x] Build manual captcha queue CLI helper (`python3 src/cli.py captcha-queue`):
-  - Automatically formats clean direct links to `@handle/about` for all channels missing an email
-  - Added 1-command email setter (`python3 src/cli.py set-email <prospect> <email>`)
-- [x] Synchronized all newly discovered contact details to `data/marketing.db` and `data/exports/prospects.csv`
+- [x] Build manual captcha queue CLI helper (`uv run marketing captcha-queue`):
+  - Formats clean direct links to `@handle/about` for all channels missing an email
+  - Added 1-command email setter (`uv run marketing set-email "<Channel Name>" <email>`)
+- [ ] **In Progress by User:** Solve YouTube captchas on high-priority channels (e.g. *Caleb Writes Code*, *Cloud X Berry*, *Nova Designs*, *Tech With Diego*) and register their emails via `uv run marketing set-email`
 
 ---
 
-## 🚀 Phase 4: Automated YouTube Prospect Discovery (Active / Completed Initial Wave)
+## 🚀 Phase 4: Automated Prospect Discovery & Human Staging (Ready)
 
-- [x] Build search discovery script (`src/discovery/search_prospects.py` & `src/cli.py discover`):
-  - Query clusters: `system design animated`, `software architecture visual`, `how redis works animation`, `devops explained visually`
-  - Automated filtering: 5,000 to 350,000 subscribers sweet spot
-  - Email extraction on channel descriptions and external domains
-  - Deduplicate against existing records in `data/marketing.db` (`src/storage/dedup.py`)
-- [x] Executed discovery run:
-  - Scanned 38 fresh channels, added 16 newly qualified prospects
-  - Auto-discovered 7 new verified business emails
-  - Total verified emails in database increased to 14
-  - Total prospects increased to 49
-- [ ] Run additional query batches on demand (`microservices architecture visual`, `docker container architecture explained`, `kafka visually explained`)
+- [x] Configure discovery pipeline to **STAGING FIRST** (`data/discovery_staging.md`):
+  - **Strict Rule:** Discovered candidates are NEVER inserted directly into `data/marketing.db`.
+  - Staged into `data/discovery_staging.md` in Obsidian/GitHub callout format for human review.
+  - The user reviews, deletes unwanted channels, and adjusts match ratings.
+  - Merge into DB only upon running: `uv run marketing import-staging`.
+- [x] Integrate CLI commands via `uv`:
+  - `uv run discover`
+  - `uv run marketing discover --query "..."`
+  - `uv run marketing import-staging`
+- [x] 16 newly discovered candidate channels staged in `data/discovery_staging.md` ready for user review.
 
 ---
 

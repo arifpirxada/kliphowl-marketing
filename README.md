@@ -4,14 +4,38 @@ Welcome to the **KlipHowl Marketing Workspace**. This directory hosts the prospe
 
 ---
 
-## 🚀 Quick Navigation for Agents & Humans
+## 🚀 Quick Start with `uv`
 
-Before executing commands or writing scripts, review the primary documentation in `docs/`:
+This project uses **[`uv`](https://github.com/astral-sh/uv)** for fast, reliable Python package and environment management.
 
-1. **[`docs/PROJECT_OVERVIEW.md`](docs/PROJECT_OVERVIEW.md)** — What KlipHowl is, the product architecture, value proposition, target market (Tech YouTube Explainers), and project objectives.
-2. **[`docs/STORAGE_PLAN.md`](docs/STORAGE_PLAN.md)** — Source-of-truth data architecture: SQLite database schema (`data/marketing.db`), prospect storage, outreach drafts, and file layout.
-3. **[`docs/YOUTUBE_DISCOVERY_PLAN.md`](docs/YOUTUBE_DISCOVERY_PLAN.md)** — YouTube Data API v3 prospecting strategy, search keywords, qualification criteria, and email extraction workflows.
-4. **[`docs/OUTREACH_STRATEGY.md`](docs/OUTREACH_STRATEGY.md)** — Email templates, personalization frameworks, value hooks, and follow-up cadences.
+### Essential Commands
+
+```bash
+# 1. View all prospects in your terminal (subs, email, match level)
+uv run marketing list
+
+# 2. View pipeline summary statistics
+uv run marketing stats
+
+# 3. View the manual captcha queue (clickable About links for missing emails)
+uv run marketing captcha-queue
+
+# 4. Set a verified email after solving a YouTube captcha
+uv run marketing set-email "Caleb Writes Code" caleb@example.com
+
+# 5. Discover new prospects (NEVER writes to DB directly; stages to markdown for review)
+uv run discover
+# or: uv run marketing discover --query "system design animated"
+
+# 6. Merge reviewed prospects from data/discovery_staging.md into the DB
+uv run marketing import-staging
+
+# 7. Sync manual edits from data/prospects.md into the DB
+uv run marketing import
+
+# 8. Export database to CSV
+uv run marketing export
+```
 
 ---
 
@@ -20,6 +44,19 @@ Before executing commands or writing scripts, review the primary documentation i
 Our primary ICP (Ideal Customer Profile) is **Tech YouTube Explainers who use visual diagrams and animations** in their videos (e.g., System Design, Software Engineering, DevOps, Computer Science fundamentals, and Web Development channels).
 
 These creators spend hours animating diagrams or hire motion designers. KlipHowl allows them to convert script/transcript excerpts directly into short animated clips (MP4) in seconds.
+
+---
+
+## 🛡️ Critical Workflow Rules
+
+1. **Staging Before Database:**
+   Whenever automated discovery runs, candidates are written to **`data/discovery_staging.md`**. They are **never added directly to `data/marketing.db`**.
+   The human operator reviews the file, deletes unwanted channels, and runs `uv run marketing import-staging` to merge approved leads.
+2. **Dual-Layer Review:**
+   - Database source of truth: `data/marketing.db`
+   - Human intake & notes: `data/prospects.md`
+   - Staging for new leads: `data/discovery_staging.md`
+   - Reviewable email drafts: `outreach/drafts/`
 
 ---
 
@@ -35,7 +72,10 @@ marketing/
 │
 ├── data/                           # Data storage (SQLite & CSV/JSON exports)
 │   ├── marketing.db                # SQLite database (channels, videos, outreach)
-│   └── exports/                    # CSV / JSON exports for quick review
+│   ├── prospects.md                # Human-curated prospect tracker (Obsidian callout format)
+│   ├── discovery_staging.md        # Staging area for newly discovered channels awaiting review
+│   └── exports/                    # CSV / JSON exports
+│       └── prospects.csv
 │
 ├── outreach/                       # Cold email assets & campaign drafts
 │   ├── templates/                  # Proven cold email copy templates
@@ -48,15 +88,8 @@ marketing/
 │   ├── outreach/                   # Personalized copy generators
 │   └── storage/                    # SQLite database models & query helpers
 │
+├── todos.md                        # Active project milestones & tasks
+├── pyproject.toml                  # Python package configuration (managed via uv)
 ├── AGENTS.md                       # Operational rules for AI pair-programmers
 └── README.md                       # This file
 ```
-
----
-
-## 🛠️ Stack & Conventions
-
-- **Language:** Python 3.10+ (Current environment: Python 3.14).
-- **Primary Data Store:** SQLite (`data/marketing.db`) — zero external infrastructure, relational integrity, portable.
-- **External APIs:** YouTube Data API v3 (search, channels, videos, playlists).
-- **Product Reference:** Located at `../kliphowl` (`docs/ARCHITECTURE.md`).

@@ -27,6 +27,10 @@ This repository is dedicated to marketing, prospect intelligence, and personaliz
 ## 3. Data Architecture & Storage Rules
 
 - **Source of Truth:** All prospects, channel metadata, video samples, and email drafts MUST be stored in the SQLite database at `data/marketing.db`.
+- **CRITICAL DISCOVERY RULE (STAGING BEFORE DB):**
+  - **Never add discovered channels directly into `data/marketing.db`!**
+  - All automated discovery results MUST be staged into **`data/discovery_staging.md`** so the user can review them, discard poor matches, and edit scores.
+  - Channels are ONLY imported into the database when the user triggers `uv run marketing import-staging` or explicitly requests it.
 - **Reviewability:** For user convenience, generated email drafts should also be written or exported as markdown files into `outreach/drafts/` so the user can easily inspect, tweak, and approve them before sending.
 - Read **[`docs/STORAGE_PLAN.md`](docs/STORAGE_PLAN.md)** before designing or modifying database tables or schemas.
 - Do NOT delete existing prospect records or outreach history without explicit user instruction.
@@ -35,9 +39,9 @@ This repository is dedicated to marketing, prospect intelligence, and personaliz
 
 ## 4. Code Standards & Environment
 
-- **Python 3:** Use standard Python idioms, type annotations, and clean modular code.
-- **Dependencies:** Keep external dependencies minimal. Use `sqlite3` from standard library. For HTTP and YouTube API, use `requests` or `google-api-python-client` with appropriate rate-limiting and error handling.
-- **API Credentials:** Never hardcode YouTube API keys or credentials in code. Store them in `.env` (gitignored) and load with `os.environ` or `dotenv`.
+- **Python Environment Manager:** Always use **`uv`** for dependency management and command execution (`uv run marketing ...`, `uv run discover ...`).
+- **Dependencies:** Keep external dependencies minimal. Use `uv add` when introducing required libraries.
+- **API Credentials:** Never hardcode YouTube API keys or credentials in code. Store them in `.env` (gitignored) and load with `os.environ` via `src/config.py`.
 
 ---
 

@@ -12,7 +12,7 @@ from src.storage.db import get_db, DEFAULT_DB_PATH
 from src.storage.sync_prospects import import_prospects_to_db, export_prospects_to_csv
 from src.enrichment.enrich_prospects import enrich_all_prospects
 from src.enrichment.deep_enrich import run_deep_enrichment, get_captcha_queue
-from src.discovery.search_prospects import discover_prospects
+from src.discovery.search_prospects import discover_prospects_to_staging, DEFAULT_STAGING_PATH
 from src.storage.dedup import deduplicate_prospects
 
 # ANSI Color Codes
@@ -178,7 +178,7 @@ def cmd_captcha_queue(args):
     print(f"\n{BOLD}{CYAN}=== Manual Email Captcha Queue ({len(queue)} channels missing email) ==={RESET}")
     print(f"YouTube gates some emails behind a web reCAPTCHA on their About page.")
     print(f"Open any of the links below, solve the captcha, then run:\n")
-    print(f"  {BOLD}python3 src/cli.py set-email <prospect_title_or_id> <email>{RESET}\n")
+    print(f"  {BOLD}uv run marketing set-email \"<Channel Name>\" <email>{RESET}\n")
     print(f"{BOLD}{'Name / Title':<26} {'Match':<9} {'Subs':<7} {'Direct About Link'}{RESET}")
     print("-" * 85)
 
@@ -225,20 +225,41 @@ def cmd_set_email(args):
 
 def cmd_discover(args):
     queries = [args.query] if args.query else None
-    print(f"{CYAN}Running automated YouTube prospect discovery...{RESET}")
-    summary = discover_prospects(
+    staging_path = args.output or DEFAULT_STAGING_PATH
+    print(f"{CYAN}Running YouTube discovery (candidates will be staged to {staging_path})...{RESET}")
+    summary = discover_prospects_to_staging(
         queries=queries,
         min_subs=args.min_subs,
         max_subs=args.max_subs,
         max_queries=args.queries,
+        output_path=staging_path,
         db_path=DEFAULT_DB_PATH
     )
-    print(f"\n{GREEN}✓ Discovery completed!{RESET}")
+    print(f"\n{GREEN}✓ Discovery complete! Staged for human review:{RESET}")
     print(f"  • Queries run: {summary['queries_run']}")
     print(f"  • Channels scanned: {summary['channels_scanned']}")
-    print(f"  • Newly qualified prospects added: {summary['qualified_added']}")
+    print(f"  • Staged in markdown: {summary['qualified_staged']}")
     print(f"  • Business emails discovered: {summary['emails_found']}")
     print(f"  • YouTube API quota units consumed: {summary['quota_used']}")
+    print(f"\n{BOLD}👉 Review candidate channels in:{RESET} {CYAN}{summary['output_path']}{RESET}")
+    print(f"   Delete any you don't want, adjust match ratings, then run:")
+    print(f"   {BOLD}uv run marketing import-staging{RESET}\n")
+
+
+def cmd_import_staging(args):
+    staging_path = args.file or DEFAULT_STAGING_PATH
+    if not os.path.exists(staging_path):
+        print(f"{RED}Error:{RESET} Staging file not found: {staging_path}")
+        return
+
+    print(f"{CYAN}Importing reviewed prospects from {staging_path} into database...{RESET}")
+    count = import_prospects_to_db(staging_path, DEFAULT_DB_PATH)
+    dedup_count = deduplicate_prospects(DEFAULT_DB_PATH)
+    export_prospects_to_csv("data/exports/prospects.csv", DEFAULT_DB_PATH)
+
+    print(f"{GREEN}✓ Successfully merged {count} reviewed prospects into database!{RESET}")
+    if dedup_count > 0:
+        print(f"  • Merged {dedup_count} duplicates.")
     print(f"  • Updated {CYAN}data/exports/prospects.csv{RESET}")
 
 
@@ -285,11 +306,16 @@ def main():
     p_disc.add_argument("--queries", type=int, default=2, help="Number of default queries to execute (default: 2)")
     p_disc.add_argument("--min-subs", type=int, default=5000, help="Minimum subscriber threshold (default: 5000)")
     p_disc.add_argument("--max-subs", type=int, default=350000, help="Maximum subscriber threshold (default: 350000)")
+    p_disc.add_argument("--output", help="Path to write staging file (default: data/discovery_staging.md)")
 
     # Set Email
     p_set = subparsers.add_parser("set-email", help="Manually set a verified email for a prospect")
     p_set.add_argument("target", help="Prospect title or ID")
     p_set.add_argument("email", help="Email address to assign")
+
+    # Import Staging
+    p_imp_stg = subparsers.add_parser("import-staging", help="Merge reviewed prospects from data/discovery_staging.md into SQLite")
+    p_imp_stg.add_argument("--file", help="Path to staging file (default: data/discovery_staging.md)")
 
     # Dedup
     subparsers.add_parser("dedup", help="Merge any duplicate channels by handle or title")
@@ -309,6 +335,8 @@ def main():
         cmd_captcha_queue(args)
     elif args.command == "discover":
         cmd_discover(args)
+    elif args.command == "import-staging":
+        cmd_import_staging(args)
     elif args.command == "set-email":
         cmd_set_email(args)
     elif args.command == "dedup":
