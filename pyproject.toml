@@ -12,6 +12,7 @@ dependencies = [
 marketing = "src.cli:main"
 discover = "src.discovery.search_prospects:main"
 draft-emails = "src.outreach.generator:main"
+help = "src.cli:cmd_help_overview"
 
 [build-system]
 requires = ["hatchling"]

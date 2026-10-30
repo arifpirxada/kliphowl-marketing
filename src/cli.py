@@ -39,6 +39,70 @@ BOLD = "\033[1m"
 RESET = "\033[0m"
 
 
+def cmd_help_overview(args=None):
+    """Display a grouped, colorful, intuitive workflow cheatsheet for KlipHowl Marketing."""
+    print(f"""
+{BOLD}{CYAN}===================================================================================================={RESET}
+                        {BOLD}🚀 KLIPHOWL MARKETING WORKFLOW & COMMAND CHEATSHEET{RESET}
+{BOLD}{CYAN}===================================================================================================={RESET}
+
+{BOLD}{MAGENTA}1. 🎯 PROSPECT MANAGEMENT & CAPTCHAS{RESET}
+   {CYAN}uv run marketing list{RESET}
+       List all prospects (subs, verified business emails, match score, links).
+   {CYAN}uv run marketing stats{RESET}
+       Show total prospects, breakdown by match level, and outreach progress.
+   {CYAN}uv run marketing captcha-queue{RESET}
+       Show channels needing 1-click manual captcha check with direct YouTube About URLs.
+   {CYAN}uv run marketing set-email "<Channel Name>" <email>{RESET}
+       Save a verified email for any channel (updates DB and re-exports CSV).
+
+{BOLD}{MAGENTA}2. 🔍 AUTOMATED DISCOVERY & HUMAN REVIEW (STAGING FIRST){RESET}
+   {CYAN}uv run discover{RESET}  {YELLOW}(or: uv run marketing discover){RESET}
+       Search YouTube for tech explainers & stage candidate channels into {CYAN}data/discovery_staging.md{RESET}.
+       {BOLD}Note:{RESET} Discovery NEVER pollutes the DB directly!
+   {CYAN}uv run discover --query "microservices architecture visual guide"{RESET}
+       Search a specific custom topic.
+   👉 {BOLD}Action:{RESET} Open {CYAN}data/discovery_staging.md{RESET}, delete channels you dislike, adjust match ratings.
+   {CYAN}uv run marketing import-staging{RESET}
+       Merge your approved prospects from {CYAN}data/discovery_staging.md{RESET} into SQLite DB.
+   {CYAN}uv run marketing dedup{RESET}
+       Safely merge duplicate channels by handle or title without data loss.
+
+{BOLD}{MAGENTA}3. ✍️ PERSONALIZED COLD EMAIL DRAFTING & REVIEW{RESET}
+   {BOLD}In-Chat AI Command:{RESET}
+       {GREEN}/generate-emails "<your custom directive>"{RESET}
+       AI reads prospect metadata + specific video titles and writes drafts into {CYAN}outreach/drafts/{RESET}.
+       Example: {GREEN}/generate-emails "Casual intro, ask if they want a 15s demo" for Caleb Writes Code{RESET}
+   {CYAN}uv run draft-emails -i "<prompt>" --preview{RESET}
+       Preview AI prompt bundles for creators in terminal without writing files.
+   {CYAN}uv run marketing review{RESET}
+       View table of all email drafts and their current review status.
+   {CYAN}uv run marketing review --id <ID>{RESET}  {YELLOW}(or: --target "<Name>"){RESET}
+       Inspect full subject and body with interactive [{BOLD}A{RESET}]pprove / [{BOLD}R{RESET}]eject / [{BOLD}S{RESET}]kip prompt.
+   {CYAN}uv run marketing review --approve <ID | all>{RESET}
+       Approve draft(s) for sending (only approved drafts can ever be dispatched).
+
+{BOLD}{MAGENTA}4. 📬 BREVO SMTP TESTING & DISPATCH{RESET}
+   {CYAN}uv run marketing test-email{RESET}
+       Verify Brevo SMTP connection & credentials ({CYAN}smtp-relay.brevo.com:587{RESET}).
+   {CYAN}uv run marketing send-approved --dry-run{RESET}
+       Simulate batch dispatch without actually sending anything.
+   {CYAN}uv run marketing send-approved{RESET}
+       Dispatch all approved drafts live (with built-in safety pacing delay).
+       Sent copies are automatically archived in {CYAN}outreach/sent/YYYY-MM/{RESET}.
+   {CYAN}uv run marketing send --id <ID>{RESET}
+       Dispatch a single approved draft by its database ID.
+
+{BOLD}{MAGENTA}5. 💾 DATA SYNC & SPREADSHEET EXPORTS{RESET}
+   {CYAN}uv run marketing export{RESET}
+       Export entire database to {CYAN}data/exports/prospects.csv{RESET} for Excel/Sheets.
+   {CYAN}uv run marketing import{RESET}
+       Sync manual additions from {CYAN}data/prospects.md{RESET} into SQLite DB.
+
+{BOLD}{CYAN}===================================================================================================={RESET}
+""")
+
+
 def format_match(match: str) -> str:
     m = (match or "").lower()
     if "very high" in m or "high" in m:
@@ -493,8 +557,17 @@ def main():
     p_export = subparsers.add_parser("export", help="Export prospects from SQLite to CSV")
     p_export.add_argument("--output", help="Output CSV path (default: data/exports/prospects.csv)")
 
+    # Workflow Help Cheatsheet
+    subparsers.add_parser("help", help="Show complete workflow cheatsheet")
+
+    if len(sys.argv) == 1:
+        cmd_help_overview()
+        return
+
     args = parser.parse_args()
-    if args.command == "import":
+    if args.command == "help":
+        cmd_help_overview()
+    elif args.command == "import":
         cmd_import(args)
     elif args.command == "enrich":
         cmd_enrich(args)
