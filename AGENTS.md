@@ -56,11 +56,11 @@ This repository is dedicated to marketing, prospect intelligence, and personaliz
 
 - **Co-Author Trailer:** Whenever creating a git commit in this repository, always append the co-author trailer:
   ```text
-  Co-authored-by: Gemini <gemini@google.com>
+  Co-authored-by: Gemini <176961590+gemini-code-assist[bot]@users.noreply.github.com>
   ```
   Example commit format:
   ```bash
   git commit -m "feat: description of work
 
-  Co-authored-by: Gemini <gemini@google.com>"
+  Co-authored-by: Gemini <176961590+gemini-code-assist[bot]@users.noreply.github.com>"
   ```

@@ -83,5 +83,5 @@ flowchart TD
 - **Environment & Commands:** Always use `uv` for dependencies and command execution (`uv run marketing ...`, `uv run discover ...`).
 - **Commit Attribution:** All git commits must append the co-author trailer:
   ```text
-  Co-authored-by: Gemini <gemini@google.com>
+  Co-authored-by: Gemini <176961590+gemini-code-assist[bot]@users.noreply.github.com>
   ```
