@@ -1,0 +1,42 @@
+# Environment & Secrets
+.env
+*.env.local
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Data & Private Prospects
+# Keep schema, but ignore private sqlite db if containing personal contact info
+data/*.db
+data/*.sqlite
+data/*.db-journal
+
+# Local drafts / archives
+# (Uncomment if drafts contain proprietary/PII info)
+# outreach/drafts/*.md
+# outreach/sent/*.md
+!outreach/drafts/.gitkeep
+!outreach/sent/.gitkeep
+!data/exports/.gitkeep
