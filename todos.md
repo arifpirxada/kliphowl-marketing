@@ -17,36 +17,41 @@ This file tracks active milestones, backlog tasks, and completed items for the K
 
 ---
 
-## 🎯 Phase 2: YouTube API Integration & Enrichment (Current Priority)
+## 🎯 Phase 2: YouTube API Integration & Enrichment (Completed / Active)
 
-- [ ] Build robust YouTube Data API v3 client (`src/discovery/yt_client.py`) with quota management & `.env` loader
-- [ ] Test API key validity with a lightweight test call
-- [ ] Build prospect enricher script (`src/enrichment/enrich_prospects.py`):
-  - [ ] For prospects with video URLs (e.g. Caleb Writes Code, Cloud X Berry, Nova Designs), query `videos().list` to extract channel ID, channel title, and view count
-  - [ ] For channels with `@handle` or channel ID, query `channels().list` to fetch exact subscriber count, video count, full description, and country
-  - [ ] Update SQLite database (`data/marketing.db`) with enriched metadata
-- [ ] Update `data/exports/prospects.csv` with fresh subscriber and channel counts
+- [x] Build robust YouTube Data API v3 client (`src/discovery/yt_client.py`) with quota management & `.env` loader
+- [x] Test API key validity with a lightweight test call (1 unit used)
+- [x] Build prospect enricher script (`src/enrichment/enrich_prospects.py` & `src/cli.py enrich`):
+  - [x] For prospects with video URLs, queried `videos().list` in batch and extracted channel IDs, video titles, and view counts
+  - [x] For channels with `@handle` or channel ID, queried `channels().list` in batch to fetch exact subscriber counts, video counts, full descriptions, and countries
+  - [x] Updated SQLite database (`data/marketing.db`) with enriched metadata (32 channels updated)
+- [x] Update `data/exports/prospects.csv` with fresh subscriber and channel counts
 
 ---
 
-## 🔍 Phase 3: Email & Contact Scraping
+## 🔍 Phase 3: Email & Contact Scraping (In Progress)
 
-- [ ] Build regex email extractor for channel descriptions (`src/enrichment/email_extractor.py`)
-- [ ] Extract external links from channel metadata (Twitter/X, GitHub, personal websites, Substack)
+- [x] Build regex email extractor for channel descriptions (`src/enrichment/email_extractor.py`)
+- [x] Auto-discovered 6 verified business inquiry emails directly from channel descriptions:
+  - Codist (`codiversitydev@gmail.com`)
+  - Kai (`kaiexplains01102002@gmail.com`)
+  - The AI Associate (`hello@theaiassociate.co`)
+  - Brain Station Advanced (`videos.brainstation@gmail.com`)
+  - The Coding Gopher (`thecodinggopher@gmail.com`)
+  - Techs Explained (`alexjaxon614@gmail.com`)
+- [ ] Secondary link scraper: Extract external links (GitHub, Twitter, personal websites) from descriptions
+- [ ] Add CLI helper for manual captcha queue: output direct links to YouTube About pages for quick 1-click captcha solves on high-match creators without public emails
 - [ ] Build GitHub profile email finder for tech creators linking their GitHub repos
-- [ ] Flag prospects requiring manual captcha check on YouTube's "View Email Address" page
 
 ---
 
-## 🚀 Phase 4: Automated YouTube Prospect Discovery
+## 🚀 Phase 4: Automated YouTube Prospect Discovery (Next Step)
 
-- [ ] Implement search scraper using target query clusters (`system design animated`, `software architecture explained`, `how X works animation`, `visual guide to`)
-- [ ] Filter candidates strictly by qualification criteria:
-  - 5,000 to 250,000 subscribers (sweet spot)
-  - Active within the last 60–90 days
-  - English language tech topics
-- [ ] Deduplicate candidates against existing records in `marketing.db`
-- [ ] Batch import newly discovered qualified prospects into the database
+- [ ] Build search discovery script (`src/discovery/search_prospects.py`):
+  - Query clusters: `system design animated`, `software architecture visual`, `how redis works animation`, `devops explained visually`
+  - Automated filtering: 5,000 to 250,000 subscribers, uploaded in last 90 days
+  - Deduplicate against existing records in `data/marketing.db`
+  - Batch import newly found qualified creators
 
 ---
 

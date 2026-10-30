@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.storage.db import get_db, DEFAULT_DB_PATH
 from src.storage.sync_prospects import import_prospects_to_db, export_prospects_to_csv
+from src.enrichment.enrich_prospects import enrich_all_prospects
 
 # ANSI Color Codes
 CYAN = "\033[36m"
@@ -70,7 +71,7 @@ def cmd_list(args):
     conn = get_db(DEFAULT_DB_PATH)
     cur = conn.cursor()
 
-    query = "SELECT id, title, handle, subscriber_count, size_tier, match_level, prospect_type, custom_url, sample_video_url, outreached FROM prospects"
+    query = "SELECT id, title, handle, subscriber_count, size_tier, match_level, prospect_type, primary_email, custom_url, sample_video_url, outreached FROM prospects"
     params = []
 
     if args.match:
@@ -90,23 +91,40 @@ def cmd_list(args):
         return
 
     print(f"\n{BOLD}{CYAN}=== KlipHowl Prospects Database ({len(rows)} records) ==={RESET}\n")
-    print(f"{BOLD}{'Name / Title':<28} {'Match':<10} {'Subs':<8} {'Type':<18} {'Outreach':<10} {'Link / Sample'}{RESET}")
-    print("-" * 95)
+    print(f"{BOLD}{'Name / Title':<26} {'Match':<9} {'Subs':<7} {'Email':<25} {'Outreach':<10} {'Link / Sample'}{RESET}")
+    print("-" * 110)
 
     for r in rows:
-        title = r['title'][:26]
+        title = r['title'][:24]
         match_str = format_match(r['match_level'])
         subs_str = format_number(r['subscriber_count'])
-        ptype = (r['prospect_type'] or 'YouTuber')[:16]
+        email_str = (r['primary_email'] or '-')[:23]
+        if r['primary_email']:
+            email_str = f"{GREEN}{email_str:<23}{RESET}"
+        else:
+            email_str = f"{YELLOW}{email_str:<23}{RESET}"
+            
         outreach_str = f"{GREEN}Sent{RESET}" if r['outreached'] else f"{YELLOW}No{RESET}"
         link = r['sample_video_url'] or r['custom_url'] or '-'
-        if len(link) > 35:
-            link = link[:32] + "..."
+        if len(link) > 30:
+            link = link[:27] + "..."
 
-        print(f"{title:<28} {match_str} {subs_str:<8} {ptype:<18} {outreach_str:<19} {link}")
+        print(f"{title:<26} {match_str} {subs_str:<7} {email_str} {outreach_str:<19} {link}")
 
-    print("-" * 95)
+    print("-" * 110)
     print(f"Total: {len(rows)} prospects | View detailed fields with SQLite or export with 'python3 src/cli.py export'\n")
+
+
+def cmd_enrich(args):
+    print(f"{CYAN}Enriching prospects with YouTube Data API v3 and scanning for emails...{RESET}")
+    summary = enrich_all_prospects(DEFAULT_DB_PATH)
+    print(f"\n{GREEN}✓ Enrichment completed!{RESET}")
+    print(f"  • Channels updated: {summary['channels_updated']}")
+    print(f"  • Business emails discovered: {summary['emails_found']}")
+    print(f"  • YouTube API quota units consumed: {summary['quota_used']}")
+    # Automatically export fresh CSV
+    export_prospects_to_csv("data/exports/prospects.csv", DEFAULT_DB_PATH)
+    print(f"  • Updated {CYAN}data/exports/prospects.csv{RESET}")
 
 
 def cmd_stats(args):
@@ -161,6 +179,9 @@ def main():
     # Stats
     subparsers.add_parser("stats", help="Display aggregate stats of prospects")
 
+    # Enrich
+    subparsers.add_parser("enrich", help="Enrich prospects with YouTube API data and extract emails")
+
     # Export
     p_export = subparsers.add_parser("export", help="Export prospects from SQLite to CSV")
     p_export.add_argument("--output", help="Output CSV path (default: data/exports/prospects.csv)")
@@ -168,6 +189,8 @@ def main():
     args = parser.parse_args()
     if args.command == "import":
         cmd_import(args)
+    elif args.command == "enrich":
+        cmd_enrich(args)
     elif args.command == "list":
         cmd_list(args)
     elif args.command == "stats":
