@@ -1,4 +1,4 @@
-# Template: Personalized demo clip top prospects
+# Template: Normal outreach without personalized demo
 
 **Best for:** Normal outreach without personalized demo video
 
