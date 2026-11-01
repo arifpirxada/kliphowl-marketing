@@ -17,7 +17,7 @@ Hi,
 
 I liked how you explained the hidden thermal trade-offs across laptop brands—especially how ASUS uses liquid metal cooling on ROG models to prevent processors from quietly throttling 40 minutes into gaming.
 
-KlipHowl lets you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
+I'm building KlipHowl, where you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
 
 Here’s a kliphowl workflow demo, made entirely with KlipHowl: https://youtu.be/fIV5jWbzmF4
 

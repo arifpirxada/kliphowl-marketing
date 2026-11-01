@@ -17,7 +17,7 @@ Hi James,
 
 I liked how you explained why the mouse cursor leans left—especially how Alan Kay’s workaround on the Xerox Alto’s 16x16 pixel grid forced the 22.5-degree tail off-center.
 
-KlipHowl lets you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
+I'm building KlipHowl, where you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
 
 Here’s a kliphowl workflow demo, made entirely with KlipHowl: https://youtu.be/fIV5jWbzmF4
 

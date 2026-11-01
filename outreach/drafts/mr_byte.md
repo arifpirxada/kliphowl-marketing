@@ -17,7 +17,7 @@ Hi Mr. Byte,
 
 I liked how you explained the ergonomics of vertical mice—specifically how keeping forearm bones parallel prevents carpal tunnel strain, even if you trade off fine cursor precision.
 
-KlipHowl lets you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
+I'm building KlipHowl, where you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
 
 Here’s a kliphowl workflow demo, made entirely with KlipHowl: https://youtu.be/fIV5jWbzmF4
 

@@ -17,7 +17,7 @@ Hi Joe,
 
 I liked how you explained how ARP broadcasts work between devices to resolve MAC addresses before capturing packets in Wireshark.
 
-KlipHowl lets you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
+I'm building KlipHowl, where you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
 
 Here’s a kliphowl workflow demo, made entirely with KlipHowl: https://youtu.be/fIV5jWbzmF4
 

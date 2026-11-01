@@ -17,7 +17,7 @@ Hi Alex,
 
 I liked how you explained the trade-off between TCP and UDP—especially the design philosophy of UDP accepting dropped packets for speed so video streams don’t freeze.
 
-KlipHowl lets you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
+I'm building KlipHowl, where you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
 
 Here’s a kliphowl workflow demo, made entirely with KlipHowl: https://youtu.be/fIV5jWbzmF4
 

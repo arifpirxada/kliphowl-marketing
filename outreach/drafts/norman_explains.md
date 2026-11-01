@@ -17,7 +17,7 @@ Hi Norman,
 
 I liked how you explained the differences between ZIP, RAR, and 7z—especially how 7z’s LZMA algorithm achieves higher compression ratios despite lacking default support on older systems.
 
-KlipHowl lets you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
+I'm building KlipHowl, where you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
 
 Here’s a kliphowl workflow demo, made entirely with KlipHowl: https://youtu.be/fIV5jWbzmF4
 
