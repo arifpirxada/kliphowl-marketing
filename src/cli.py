@@ -24,11 +24,14 @@ from src.outreach.repository import (
     sync_drafts_from_disk,
     record_prospect_reply
 )
+from src.config import ADMIN_EMAIL
 from src.outreach.generator import prepare_candidate_bundles
 from src.outreach.sender import (
     test_smtp_connection,
     dispatch_draft,
-    dispatch_all_approved
+    dispatch_all_approved,
+    send_test_draft_to_admin,
+    send_admin_notification
 )
 
 # ANSI Color Codes
@@ -92,11 +95,14 @@ def cmd_help_overview(args=None):
 {BOLD}{MAGENTA}4. 📬 BREVO SMTP TESTING & DISPATCH{RESET}
    {CYAN}uv run marketing test-email{RESET}
        Verify Brevo SMTP connection & credentials ({CYAN}smtp-relay.brevo.com:587{RESET}).
+   {CYAN}uv run marketing test-email --draft <name | ID>{RESET}  {YELLOW}(or: test-mail --draft <name>){RESET}
+       Send a test preview of any draft directly to {CYAN}ADMIN_EMAIL{RESET} to inspect it in your inbox!
    {CYAN}uv run marketing send-approved --dry-run{RESET}
-       Simulate batch dispatch without actually sending anything.
+       Safety simulation: prints what would be sent without delivering actual emails.
    {CYAN}uv run marketing send-approved{RESET}
        Dispatch all approved drafts live (with built-in safety pacing delay).
-       Sent copies are automatically archived in {CYAN}outreach/sent/YYYY-MM/{RESET}.
+       A confirmation summary report is automatically delivered to {CYAN}ADMIN_EMAIL{RESET}.
+       Sent copies are archived in {CYAN}outreach/sent/YYYY-MM/{RESET}.
    {CYAN}uv run marketing send --id <ID>{RESET}
        Dispatch a single approved draft by its database ID.
 
@@ -467,10 +473,44 @@ def cmd_review(args):
 
 
 def cmd_test_email(args):
+    draft_arg = getattr(args, "draft", None)
+    if draft_arg:
+        if not ADMIN_EMAIL:
+            print(f"{RED}Error:{RESET} ADMIN_EMAIL is not set in .env.")
+            print("Please add ADMIN_EMAIL=your_email@domain.com in .env to receive test drafts.")
+            return
+
+        draft = None
+        if str(draft_arg).isdigit():
+            draft = get_draft_by_id(int(draft_arg))
+        if not draft:
+            draft = get_draft_by_target(draft_arg)
+
+        if not draft:
+            print(f"{RED}Error:{RESET} Could not find any draft matching '{draft_arg}'.")
+            print("Run 'uv run marketing review' to see available draft IDs and channels.")
+            return
+
+        print(f"{CYAN}Sending test preview of draft #{draft['id']} ({draft['channel_title']}) to ADMIN_EMAIL ({ADMIN_EMAIL})...{RESET}")
+        try:
+            send_test_draft_to_admin(draft)
+            print(f"{GREEN}✓ SUCCESS: Test preview delivered to {ADMIN_EMAIL}!{RESET}")
+            print(f"  • Target Creator : {draft['channel_title']}")
+            print(f"  • Real Recipient : {draft['recipient_email']}")
+            print(f"  • Subject        : {draft['subject_line']}")
+            print(f"  • Status in DB   : {draft['status']} (unchanged)")
+        except Exception as e:
+            print(f"{RED}✗ ERROR: Failed to send test preview:{RESET} {e}")
+        return
+
     print(f"{CYAN}Testing Brevo SMTP connection and authentication...{RESET}")
     try:
         if test_smtp_connection():
             print(f"{GREEN}✓ SUCCESS: Authenticated with Brevo SMTP successfully! Ready for outreach dispatch.{RESET}")
+            if ADMIN_EMAIL:
+                print(f"  • ADMIN_EMAIL configured: {CYAN}{ADMIN_EMAIL}{RESET}")
+                print(f"  • To send a test draft preview to your inbox, run:")
+                print(f"    {BOLD}uv run marketing test-email --draft <draft_name or ID>{RESET}")
     except Exception as e:
         print(f"{RED}✗ ERROR: SMTP Connection failed:{RESET} {e}")
 
@@ -484,6 +524,12 @@ def cmd_send(args):
             else:
                 print(f"{GREEN}✓ Successfully dispatched email #{args.id} to {res['recipient']}!{RESET}")
                 print(f"  • Archived copy saved to: {CYAN}{res.get('archive_path')}{RESET}")
+                if ADMIN_EMAIL:
+                    from datetime import datetime
+                    send_admin_notification(
+                        subject=f"[KlipHowl Outreach] Single Email Sent: Draft #{args.id}",
+                        body_text=f"Outreach email #{args.id} was dispatched to {res['recipient']} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.\n\nArchived copy: {res.get('archive_path')}"
+                    )
         except Exception as e:
             print(f"{RED}Error:{RESET} {e}")
     else:
@@ -600,8 +646,18 @@ def main():
     p_draft.add_argument("--limit", "-l", type=int, help="Limit number of prospects to process")
     p_draft.add_argument("--preview", action="store_true", help="Print prompt bundles without writing files")
 
-    # Test Email Connection
-    subparsers.add_parser("test-email", help="Verify Brevo SMTP connectivity and credentials")
+    # Test Email Connection & Preview
+    p_test = subparsers.add_parser("test-email", help="Verify Brevo SMTP connectivity or send test draft to ADMIN_EMAIL")
+    p_test.add_argument("subaction", nargs="?", help="Optional subcommand (e.g. 'mail')")
+    p_test.add_argument("--draft", help="Draft ID or channel name to preview in ADMIN_EMAIL inbox")
+
+    p_test_m = subparsers.add_parser("test-mail", help="Alias for test-email")
+    p_test_m.add_argument("subaction", nargs="?", help="Optional subcommand")
+    p_test_m.add_argument("--draft", help="Draft ID or channel name to preview in ADMIN_EMAIL inbox")
+
+    p_test_short = subparsers.add_parser("test", help="Alias for test-email")
+    p_test_short.add_argument("subaction", nargs="?", help="Optional subcommand (e.g. 'mail')")
+    p_test_short.add_argument("--draft", help="Draft ID or channel name to preview in ADMIN_EMAIL inbox")
 
     # Send Emails
     p_send = subparsers.add_parser("send", help="Dispatch approved outreach email(s) via Brevo SMTP")
@@ -669,7 +725,7 @@ def main():
     elif args.command == "draft-emails":
         from src.outreach.generator import main as gen_main
         gen_main()
-    elif args.command == "test-email":
+    elif args.command in ("test-email", "test-mail", "test"):
         cmd_test_email(args)
     elif args.command in ("send", "send-approved"):
         if not hasattr(args, "id"):

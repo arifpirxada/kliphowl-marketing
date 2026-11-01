@@ -6,6 +6,7 @@ import smtplib
 import time
 from datetime import datetime
 from email.message import EmailMessage
+from email.utils import parseaddr, formataddr
 from typing import Dict, List, Optional
 
 from src.config import (
@@ -15,7 +16,8 @@ from src.config import (
     BREVO_SMTP_KEY,
     EMAIL_FROM,
     SENDER_NAME,
-    SENDER_EMAIL
+    SENDER_EMAIL,
+    ADMIN_EMAIL
 )
 from src.outreach.repository import (
     get_draft_by_id,
@@ -66,12 +68,21 @@ def send_email_message(
     if not BREVO_SMTP_LOGIN or not BREVO_SMTP_KEY:
         raise EmailSenderError("Missing Brevo credentials in .env")
 
+    # Clean sender address and name
+    name, raw_from_addr = parseaddr(EMAIL_FROM or SENDER_EMAIL or "")
+    from_addr = raw_from_addr or EMAIL_FROM or SENDER_EMAIL
+    from_name = SENDER_NAME or name
+
+    # Clean recipient address and name
+    r_name, raw_to_addr = parseaddr(to_email)
+    target_addr = raw_to_addr or to_email
+    target_name = to_name or r_name
+
     msg = EmailMessage()
     msg["Subject"] = subject
-    from_header = f"{SENDER_NAME} <{EMAIL_FROM}>" if SENDER_NAME else EMAIL_FROM
-    msg["From"] = from_header
-    msg["To"] = f"{to_name} <{to_email}>" if to_name else to_email
-    msg["Reply-To"] = SENDER_EMAIL or EMAIL_FROM
+    msg["From"] = formataddr((from_name, from_addr)) if from_name else from_addr
+    msg["To"] = formataddr((target_name, target_addr)) if target_name else target_addr
+    msg["Reply-To"] = SENDER_EMAIL or from_addr
 
     msg.set_content(body_text.strip())
 
@@ -79,10 +90,10 @@ def send_email_message(
         server = smtplib.SMTP(BREVO_SMTP_HOST, BREVO_SMTP_PORT, timeout=15)
         server.starttls()
         server.login(BREVO_SMTP_LOGIN, BREVO_SMTP_KEY)
-        server.send_message(msg)
+        server.send_message(msg, from_addr=from_addr, to_addrs=[target_addr])
         server.quit()
     except Exception as e:
-        raise EmailSenderError(f"Failed to dispatch email to {to_email}: {e}")
+        raise EmailSenderError(f"Failed to dispatch email to {target_addr}: {e}")
 
 
 def archive_sent_draft(draft: Dict, sent_timestamp: str) -> str:
@@ -116,6 +127,50 @@ notes: "{draft.get('notes') or ''}"
         f.write(content)
 
     return archive_path
+
+
+def send_admin_notification(subject: str, body_text: str) -> bool:
+    """Send an administrative report/notification email to ADMIN_EMAIL."""
+    if not ADMIN_EMAIL:
+        logger.info("ADMIN_EMAIL not set, skipping admin notification.")
+        return False
+    try:
+        send_email_message(
+            to_email=ADMIN_EMAIL,
+            subject=subject,
+            body_text=body_text,
+            to_name="KlipHowl Admin"
+        )
+        logger.info(f"✓ Notification dispatched to ADMIN_EMAIL ({ADMIN_EMAIL})")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send admin notification to {ADMIN_EMAIL}: {e}")
+        return False
+
+
+def send_test_draft_to_admin(draft: Dict) -> bool:
+    """Send a preview copy of an email draft directly to ADMIN_EMAIL without modifying DB status."""
+    if not ADMIN_EMAIL:
+        raise EmailSenderError("ADMIN_EMAIL is not configured in .env. Please add ADMIN_EMAIL=your_email@domain.com")
+
+    subject = f"[TEST PREVIEW] {draft['subject_line']}"
+    header_block = f"""======================================================================
+[TEST DRAFT PREVIEW — DISPATCHED TO ADMIN: {ADMIN_EMAIL}]
+Target Creator   : {draft['channel_title']}
+Recipient Address: {draft['recipient_email']}
+Current Status   : {draft['status']}
+Draft File       : {draft.get('draft_file_path') or 'N/A'}
+======================================================================
+
+"""
+    body_text = header_block + draft["body_markdown"].strip()
+    send_email_message(
+        to_email=ADMIN_EMAIL,
+        subject=subject,
+        body_text=body_text,
+        to_name="KlipHowl Admin"
+    )
+    return True
 
 
 def dispatch_draft(
@@ -212,6 +267,38 @@ def dispatch_all_approved(
             results.append({"draft_id": d["id"], "sent": False, "error": str(e)})
 
     sent_count = sum(1 for r in results if r.get("sent"))
+    failed_count = sum(1 for r in results if not r.get("sent") and not r.get("dry_run"))
+
+    # Send batch dispatch summary report to ADMIN_EMAIL
+    if not dry_run and ADMIN_EMAIL and results:
+        lines = []
+        for r in results:
+            if r.get("sent"):
+                lines.append(f"• [SENT] Draft #{r['draft_id']} to {r.get('recipient')}")
+            else:
+                lines.append(f"• [FAILED] Draft #{r['draft_id']}: {r.get('error')}")
+
+        details_str = "\n".join(lines)
+        report_subject = f"[KlipHowl Outreach] Batch Dispatch Report: {sent_count} sent, {failed_count} failed"
+        report_body = f"""Hi {SENDER_NAME or 'Admin'},
+
+Here is the confirmation summary for your outreach batch:
+
+• Total Processed: {len(results)}
+• Successfully Sent: {sent_count}
+• Failed: {failed_count}
+• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Delivery Log:
+{details_str}
+
+All sent drafts have been archived in outreach/sent/ and recorded in SQLite database.
+
+Best,
+KlipHowl Outreach Engine
+"""
+        send_admin_notification(report_subject, report_body)
+
     return {
         "total_approved": len(approved_drafts),
         "sent_count": sent_count,
