@@ -19,9 +19,7 @@ I liked how you explained why the mouse cursor leans left—especially how Alan 
 
 I'm building KlipHowl, where you describe an animation clip in plain English and refine it by chatting (“make the package bigger”, “remove the title”), with no editor to learn.
 
-Here’s a kliphowl workflow demo, made entirely with KlipHowl: https://youtu.be/fIV5jWbzmF4
-
-I’m giving a small group of creators free credits to try it. Reply “yes” and I’ll set up your access personally.
+I recorded a quick 30-second workflow demo showing how this works. If you're interested, reply “yes” and I'll send over the video link and set up your free credits personally.
 
 arifpirxada
-founder | https://kliphowl.com
+founder | KlipHowl
