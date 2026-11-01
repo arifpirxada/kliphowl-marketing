@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "requests>=2.31.0",
+    "youtube-transcript-api>=1.2.4",
 ]
 
 [project.scripts]
